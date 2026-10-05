@@ -1,6 +1,8 @@
 import type {
   ApiUser,
   AuthUser,
+  PageLinkRow,
+  PageRow,
   SanctionRow,
   SessionRow,
   UserNoteRow,
@@ -116,5 +118,84 @@ export function toUserSummary(row: {
     displayName: row.display_name ?? row.username,
     role: row.role ?? null,
     status: row.status ?? null,
+  }
+}
+
+// ------------------------------------------------------------------- pages --
+
+/**
+ * Owner shape: the same page the owner sees everywhere.
+ *
+ * Publish state is `status` — the 0001 column — rather than a derived
+ * `isPublished` boolean, so the owner can also see `archived` and can never see
+ * a state the database cannot hold. `moderationStatus` is included because the
+ * owner must know when their page stops being public; `revision` too, so the
+ * editor can display "published as revision N".
+ */
+export function toApiPage(row: PageRow, revision: number | null): Record<string, unknown> {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    bio: row.bio,
+    theme: row.theme,
+    layout: row.layout,
+    accentColor: row.accent_color,
+    showBranding: row.show_branding === 1,
+    status: row.status,
+    moderationStatus: row.moderation_status,
+    visibility: row.visibility,
+    revision,
+    publishedAt: row.published_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
+  }
+}
+
+/**
+ * Public shape: exactly what an anonymous browser needs to render a link page,
+ * and nothing it must not have. Internal moderation counters, revision history
+ * and database-only fields are deliberately absent.
+ */
+export function toPublicPage(
+  row: PageRow,
+  username: string,
+  displayName: string,
+  links: ReturnType<typeof toPageLinkDto>[],
+): Record<string, unknown> {
+  return {
+    slug: row.slug,
+    title: row.title,
+    bio: row.bio,
+    theme: row.theme,
+    layout: row.layout,
+    accentColor: row.accent_color,
+    showBranding: row.show_branding === 1,
+    owner: { username, displayName },
+    links,
+  }
+}
+
+/**
+ * A link as the API exposes it. The display text is `title` and the icon is
+ * `icon` because those are the 0001 column names — see the note in
+ * migrations/0002_pages_theme_and_scheduling.sql for why the API follows the
+ * database here instead of inventing `label` / `iconKey`.
+ */
+export function toPageLinkDto(row: PageLinkRow): Record<string, unknown> {
+  return {
+    id: row.id,
+    title: row.title,
+    url: row.url,
+    domain: row.domain,
+    description: row.description,
+    icon: row.icon,
+    position: row.position,
+    isVisible: row.is_visible === 1,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   }
 }

@@ -63,6 +63,38 @@ export const DEFAULT_RESERVED_USERNAMES = [
 ] as const
 
 /**
+ * Slugs nobody may claim for a link page.
+ *
+ * Guarded for the same reason as reserved usernames: a freshly seeded page
+ * must never be able to squat a path the platform itself serves (`api`,
+ * `login`, `health` …) or a page an administrator deleted (`slug_reservations`).
+ * Stored as JSON in `content.reserved_slugs`
+ * (seed/0001_platform-defaults.sql) so an owner can extend it at runtime; keep
+ * the two lists in sync. Compared case-insensitively, after normalisation.
+ */
+export const DEFAULT_RESERVED_SLUGS = [
+  'admin',
+  'api',
+  'settings',
+  'login',
+  'logout',
+  'signup',
+  'register',
+  'dashboard',
+  'about',
+  'terms',
+  'privacy',
+  'support',
+  'help',
+  'static',
+  'assets',
+  'health',
+  'favicon.ico',
+  'robots.txt',
+  'sitemap.xml',
+] as const
+
+/**
  * Higher = more privileged. Authorisation requires a *strictly* higher rank to
  * act on someone, so peers can never sanction each other.
  */

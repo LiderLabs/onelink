@@ -1,6 +1,7 @@
 import { now } from '../lib/clock'
 import {
   DEFAULT_PLATFORM_NAME,
+  DEFAULT_RESERVED_SLUGS,
   DEFAULT_RESERVED_USERNAMES,
   SETTINGS_CACHE_TTL_MS,
 } from '../lib/constants'
@@ -154,6 +155,26 @@ export function reservedUsernamesOf(map: SettingsMap): string[] {
     .filter((entry) => entry.length > 0)
 
   return entries.length > 0 ? entries : [...DEFAULT_RESERVED_USERNAMES]
+}
+
+/**
+ * Slugs nobody may claim for a link page.
+ *
+ * Mirrors `reservedUsernamesOf`: falls back to the compiled-in list when the
+ * setting is missing or malformed, so a broken row degrades to the safe
+ * default instead of opening platform paths (`api`, `login`, `health`) to
+ * squatting.
+ */
+export function reservedSlugsOf(map: SettingsMap): string[] {
+  const value = map[SETTING_KEYS.reservedSlugs]
+  if (!Array.isArray(value)) return [...DEFAULT_RESERVED_SLUGS]
+
+  const entries = value
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0)
+
+  return entries.length > 0 ? entries : [...DEFAULT_RESERVED_SLUGS]
 }
 
 // ── well-known keys ─────────────────────────────────────────────────────────

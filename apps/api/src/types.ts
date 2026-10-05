@@ -117,6 +117,92 @@ export interface UserNoteRow {
   created_at: number
 }
 
+export type PageStatus = 'draft' | 'published' | 'archived'
+/** Mirrors the CHECK in migrations/0001_init.sql — note there is no `flagged`. */
+export type PageModerationStatus = 'visible' | 'under_review' | 'removed'
+export type PageVisibility = 'public' | 'unlisted'
+/** Only ever written as these two by the API; the 0001 column has no CHECK. */
+export type PageTheme = 'light' | 'dark'
+/** Enforced by the zod schema: 0002 could not add a CHECK via ALTER TABLE. */
+export type PageLayout = 'list' | 'grid'
+
+/**
+ * `pages` as stored. Column names are the migration's, deliberately: the service
+ * reads and writes them directly, so a rename here silently diverges from the
+ * SQL. `layout`, `accent_color` and `show_branding` arrive in 0002.
+ */
+export interface PageRow {
+  id: string
+  user_id: string
+  slug: string
+  title: string | null
+  bio: string | null
+  theme: PageTheme | null
+  layout: PageLayout
+  accent_color: string | null
+  show_branding: number
+  status: PageStatus
+  moderation_status: PageModerationStatus
+  visibility: PageVisibility
+  open_report_count: number
+  flag_count: number
+  view_count: number
+  content_revision: number
+  published_at: number | null
+  first_published_at: number | null
+  created_at: number
+  updated_at: number
+  deleted_at: number | null
+}
+
+/** `page_links` as stored: display text is `title`, the icon is `icon`. */
+export interface PageLinkRow {
+  id: string
+  page_id: string
+  title: string
+  url: string
+  domain: string | null
+  icon: string | null
+  description: string | null
+  position: number
+  is_visible: number
+  starts_at: number | null
+  ends_at: number | null
+  clicks: number
+  created_at: number
+  updated_at: number
+  deleted_at: number | null
+}
+
+/** `page_revisions.reason` is NOT NULL and CHECKed, so publishes must pass one. */
+export type PageRevisionReason =
+  | 'publish'
+  | 'edit'
+  | 'report'
+  | 'moderation_removal'
+  | 'moderation_restore'
+  | 'daily'
+
+export interface PageRevisionRow {
+  id: string
+  page_id: string
+  revision: number
+  snapshot: string
+  reason: PageRevisionReason
+  created_by: string | null
+  created_at: number
+}
+
+export interface SlugReservationRow {
+  id: string
+  slug: string
+  page_id: string | null
+  reserved_by: string | null
+  reason: string
+  created_at: number
+  released_at: number | null
+}
+
 export interface RateLimitRow {
   key: string
   scope: 'ip' | 'user' | 'global'

@@ -93,6 +93,7 @@ INSERT OR IGNORE INTO rate_limits (key, scope, max_requests, window_seconds, act
   ('login_user',         'user',   10,   900,  'block',    1, 1735689600000),
   ('register_ip',        'ip',     5,    3600, 'block',    1, 1735689600000),
   ('password_reset_ip',  'ip',     5,    3600, 'block',    1, 1735689600000),
+  ('pages_write_user',   'user',   120,  3600, 'block',    1, 1735689600000),
   ('report_create_ip',   'ip',     10,   3600, 'block',    1, 1735689600000),
   ('media_upload_user',  'user',   60,   3600, 'throttle', 1, 1735689600000),
   ('api_global',         'global', 6000, 60,   'throttle', 1, 1735689600000);

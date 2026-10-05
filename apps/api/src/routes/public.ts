@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
-import { ok } from '../lib/http'
+import { normalizeSlug, ok } from '../lib/http'
 import { capabilitiesOf, CAPABILITIES } from '../lib/rbac'
 import { ROLE_RANK, ROLES, STAFF_ROLES } from '../lib/constants'
 import { getPublicSettings, SETTING_KEYS } from '../services/settings.service'
+import { getPublicPage } from '../services/page.service'
 import type { AppEnv } from '../types'
 
 // ============================================================================
@@ -25,6 +26,23 @@ const PUBLIC_SETTING_KEYS = new Set<string>([
 ])
 
 export const publicRoutes = new Hono<AppEnv>()
+
+/**
+ * Anonymous page read. The ONLY unauthenticated page surface.
+ *
+ * `/:slug` is looked up AFTER normalisation — "/Ada", "/ADA" and "/ada" are
+ * the same page — and visibility is enforced in one place
+ * (`getPublicPage`): live, published, owner usable, links visible and
+ * in-window. Anything else is `404 Page`, indistinguishable from an unknown
+ * slug, so the response reveals nothing about why a page is unreachable.
+ *
+ * Pure read: no counters, no audit rows. Anonymous reads are not attributed to
+ * anyone, so an audit entry would be noise; view counting arrives separately.
+ */
+publicRoutes.get('/pages/:slug', async (c) => {
+  const slug = normalizeSlug(c.req.param('slug'))
+  return ok(c, await getPublicPage(c.env.DB, slug))
+})
 
 publicRoutes.get('/settings', async (c) => {
   const { settings, platformName } = await getPublicSettings(c.env.DB)
