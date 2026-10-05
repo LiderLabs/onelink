@@ -1,0 +1,149 @@
+@import 'tailwindcss';
+
+/* ============================================================================
+   OneLink — "ink on paper".
+
+   The product is a link page: typographic, printed, personal. So the surface is
+   paper, the voice is a broadsheet, and the only structural devices are rules,
+   stamps and a single vermilion accent. No glassmorphism, no gradient mesh, no
+   rounded-everything: those read as "generic dashboard", which is precisely the
+   register this interface should not have.
+
+   Tokens live here (Tailwind v4 CSS-first config) so `bg-paper`, `text-ink`,
+   `font-display` etc. are generated from one source of truth.
+   ========================================================================== */
+@theme {
+  --color-paper: #f4f1e7;
+  --color-paper-deep: #e9e4d6;
+  --color-card: #fbf9f3;
+  --color-ink: #16170f;
+  --color-ink-soft: #4b4d3e;
+  --color-ink-faint: #8b8d78;
+  --color-rule: #cdc7b3;
+  --color-vermilion: #cf3a12;
+  --color-sage: #5c6f4f;
+  --color-amber: #9c6410;
+
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Archivo', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: 'ss01' 1;
+    min-height: 100vh;
+    /* A faint diagonal wash so large empty areas are not flat colour. */
+    background-image:
+      radial-gradient(120% 80% at 100% 0%, rgba(207, 58, 18, 0.07), transparent 60%),
+      radial-gradient(90% 70% at 0% 100%, rgba(92, 111, 79, 0.09), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-vermilion);
+    outline-offset: 2px;
+    border-radius: 1px;
+  }
+
+  /* Print grain. Decorative only, so it is excluded from hit-testing and from
+     the accessibility tree entirely. */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+    opacity: 0.55;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.32'/%3E%3C/svg%3E");
+  }
+}
+
+/* ------------------------------------------------------------- ornaments -- */
+
+/* Small caps mono label used for eyebrows, field labels and metadata keys. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+}
+
+/* A rotated rubber stamp. Purely expressive, but it also carries meaning in the
+   account screens: the label states what the screen is for. */
+.stamp {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  transform: rotate(-3deg);
+  opacity: 0.85;
+}
+
+/* Account-panel card: paper with a hard offset shadow, like a paste-up. */
+.plate {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-rule);
+  box-shadow: 6px 6px 0 rgba(22, 23, 15, 0.08);
+}
+
+/* --------------------------------------------------------------- motion --- */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.reveal {
+  animation: rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+@keyframes sweep {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.sweep {
+  transform-origin: left;
+  animation: sweep 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal,
+  .sweep {
+    animation: none;
+  }
+}

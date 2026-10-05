@@ -9,9 +9,11 @@
   ],
   "scripts": {
     "dev": "npm run dev -w @onelink/api",
-    "deploy": "npm run deploy -w @onelink/api",
+    "dev:web": "npm run dev -w @onelink/web",
+    "build": "npm run build -w @onelink/web",
+    "deploy": "npm run build -w @onelink/web && npm run deploy -w @onelink/api",
     "types": "npm run types -w @onelink/api",
-    "typecheck": "npm run types && npm run typecheck -w @onelink/api",
+    "typecheck": "npm run types && npm run typecheck -w @onelink/api && npm run typecheck -w @onelink/web",
     "test": "npm run test -w @onelink/api",
     "db:create": "npm run db:create -w @onelink/api",
     "db:migrate:local": "npm run db:migrate:local -w @onelink/api",

@@ -15,7 +15,16 @@ apps/api
   seed/            platform defaults (idempotent, INSERT OR IGNORE)
   scripts/         seed-owner.mjs — creates/refreshes the owner account
   test/            vitest suites (run inside workerd via @cloudflare/vitest-plugin)
+
+apps/web
+  src/lib          typed API client, session store, formatting
+  src/components   shell, auth frame, field/button/notice primitives
+  src/routes       login, register, forgot-password, reset-password, profile
 ```
+
+The SPA is served by the API Worker itself (`assets.directory` in
+`apps/api/wrangler.jsonc`). One origin means the `__Host-` session cookie needs
+no CORS, no `SameSite=None`, and no custom domain.
 
 ## Requirements
 
@@ -31,8 +40,14 @@ cp .dev.vars.example .dev.vars      # then edit the values
 npm run db:migrate:local
 npm run db:seed:local
 npm run db:seed:owner               # prints the owner credentials
-npm run dev                         # wrangler dev, http://localhost:8787
+npm run dev                         # wrangler dev (API) on http://localhost:8787
+npm run dev:web                     # in a second terminal: Vite on http://localhost:5173
 ```
+
+Use `http://localhost:5173`, not the Worker's own port. The Vite dev server
+proxies `/api` to `wrangler dev`, so development goes through exactly the
+same-origin, credentialed path production uses — which is the only way the
+`__Host-` cookie behaves at all.
 
 `.dev.vars` overrides the committed `vars` in `wrangler.jsonc`, which is what
 keeps local development on `ENVIRONMENT=development` while deploys ship
@@ -41,8 +56,8 @@ keeps local development on `ENVIRONMENT=development` while deploys ship
 ## Tests and typecheck
 
 ```bash
-npm test          # 94 tests, run in workerd against a local D1
-npm run typecheck # regenerates worker-configuration.d.ts, then tsc --noEmit
+npm test          # 94 API tests, run in workerd against a local D1
+npm run typecheck # regenerates worker-configuration.d.ts, then typechecks both workspaces
 ```
 
 `worker-configuration.d.ts` is generated and gitignored, so run typechecks from
@@ -63,11 +78,19 @@ npm run deploy
 npm run db:seed:owner:remote                        # prints the owner credentials
 ```
 
-Subsequent deploys are just `npm run deploy` (migrations first if the schema
-changed). Smoke test:
+Subsequent deploys are just `npm run deploy` — it builds the SPA first, then
+uploads the Worker and its assets (so the two can never drift apart). Run
+migrations first if the schema changed.
+
+If the deployed origin changes, update `APP_ORIGIN` in `apps/api/wrangler.jsonc`:
+it is both the CORS allow-list and the base of password-reset links.
+
+Smoke test:
 
 ```bash
-curl https://<worker>/api/v1/health
+curl -i https://<worker>/                        # the SPA shell (text/html)
+curl -i https://<worker>/api/v1/health           # JSON, even with Accept: text/html
+curl -i "https://<worker>/reset-password?token=x" # deep link -> index.html
 curl https://<worker>/api/v1/public/settings
 ```
 

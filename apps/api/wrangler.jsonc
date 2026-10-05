@@ -56,5 +56,28 @@
       "binding": "PRIVATE_BUCKET",
       "bucket_name": "onelink-private"
     }
-  ]
+  ],
+  "assets": {
+    // The built admin SPA (apps/web), served from this same origin. That is what
+    // makes `__Host-onelink_session` work without a custom domain: the browser
+    // only accepts a `__Host-` cookie from a Secure, Domain-less origin, so SPA
+    // and API sharing one host removes an entire class of CORS and SameSite
+    // problem rather than configuring around it.
+    //
+    // `../web/dist` is relative to this file. The directory is gitignored: it is
+    // produced by `npm run build` (see the root `deploy` script), not committed.
+    "directory": "../web/dist",
+
+    // Deep links such as /reset-password?token=… are client-side routes with no
+    // file behind them, so unknown paths serve index.html. Without this a reset
+    // link would 404 at the edge before React ever ran.
+    "not_found_handling": "single-page-application",
+
+    // …but /api/* must always reach the Worker. The asset router treats a GET
+    // that looks like a browser navigation (Accept: text/html) as a page request
+    // and would otherwise answer it with index.html — so navigating to
+    // /api/v1/health in a tab would render the SPA instead of JSON. Listing the
+    // API prefix here takes those requests out of that decision entirely.
+    "run_worker_first": ["/api/*"]
+  }
 }
