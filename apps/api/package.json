@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "node ./scripts/sync-dev-vars.mjs && wrangler dev",
     "deploy": "wrangler deploy",
     "types": "wrangler types --env-interface CloudflareBindings",
     "typecheck": "tsc --noEmit",

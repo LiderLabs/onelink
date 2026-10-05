@@ -36,7 +36,7 @@ no CORS, no `SameSite=None`, and no custom domain.
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars      # then edit the values
+cp .dev.vars.example .dev.vars      # then edit the values (repository root)
 npm run db:migrate:local
 npm run db:seed:local
 npm run db:seed:owner               # prints the owner credentials
@@ -49,9 +49,28 @@ proxies `/api` to `wrangler dev`, so development goes through exactly the
 same-origin, credentialed path production uses — which is the only way the
 `__Host-` cookie behaves at all.
 
-`.dev.vars` overrides the committed `vars` in `wrangler.jsonc`, which is what
-keeps local development on `ENVIRONMENT=development` while deploys ship
-`production`. It is gitignored — never commit real secret values.
+### Where `.dev.vars` lives (and why that is fiddly)
+
+The file you edit is the one at the **repository root**. `wrangler`, however,
+resolves `.dev.vars` relative to the directory that holds `wrangler.jsonc` —
+`apps/api/` — so on its own it never sees the root file. `npm run dev` therefore
+copies the root file to `apps/api/.dev.vars` before starting wrangler
+(`apps/api/scripts/sync-dev-vars.mjs`).
+
+- **Edit the root `.dev.vars`**, never `apps/api/.dev.vars`. The latter is
+  generated — it says so in its own header — and is overwritten on every
+  `npm run dev`.
+- **Restart `npm run dev` after editing it.** wrangler watches the copy, not the
+  source, so an edit made while the dev server is running is not picked up.
+- If the root file is missing, `npm run dev` stops with instructions instead of
+  starting a Worker that answers `500` to everything — which is what "local runs
+  as `production` (the committed default) with no `SESSION_PEPPER`" looks like
+  from the outside, and it is easy to mistake for a code bug.
+
+`ENVIRONMENT=development` in that file is what unlocks the local affordances
+(reset tokens returned in response bodies, so the password-reset flow is
+testable without a mail provider). Both files are gitignored — never commit real
+secret values; `.dev.vars.example` is the committed template.
 
 ## Tests and typecheck
 

@@ -117,6 +117,15 @@ function parseArgs(argv) {
 const args = parseArgs(process.argv.slice(2))
 const devVars = readDevVars()
 
+// Report which file the credentials came from. Two `.dev.vars` files can exist
+// on disk — `apps/api/.dev.vars` is generated for wrangler by sync-dev-vars.mjs —
+// and a silent mismatch between the file this script hashes from and the one the
+// Worker actually reads only ever surfaces much later, as "the password is
+// wrong".
+console.log(
+  `Owner credentials from ${path.join(API_ROOT, '..', '..', '.dev.vars')} (${Object.keys(devVars).length} keys)`,
+)
+
 const email = (args.email ?? devVars.OWNER_EMAIL ?? process.env.OWNER_EMAIL ?? '').trim().toLowerCase()
 const password = args.password ?? devVars.OWNER_PASSWORD ?? process.env.OWNER_PASSWORD ?? ''
 

@@ -18,9 +18,14 @@
     // direction is the default rather than the exception. `lib/config.ts`
     // fails closed on any unrecognised value, which makes a typo louder still.
     //
-    // Local development is unaffected: `.dev.vars` takes precedence over `vars`
-    // and sets ENVIRONMENT=development. That file is gitignored, so this value
-    // is what actually ships.
+    // Local development is unaffected — but only because of exactly where the
+    // file sits. wrangler resolves `.dev.vars` relative to the directory holding
+    // THIS file (`apps/api/`), not the directory npm was run from, so a
+    // `.dev.vars` at the repository root does nothing on its own: the Worker
+    // never sees it, runs as production, and then answers 500 to every request
+    // for a missing SESSION_PEPPER. The canonical file lives at the root (it is
+    // the one you edit, and the one seed-owner.mjs reads), and `npm run dev`
+    // copies it to `apps/api/.dev.vars` first — see scripts/sync-dev-vars.mjs.
     "ENVIRONMENT": "production",
 
     // Public origin of the deployment. The SPA is served by this same Worker,
