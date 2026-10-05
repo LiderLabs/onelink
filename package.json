@@ -1,0 +1,27 @@
+{
+  "name": "onelink",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OneLink — admin backend (Hono on Cloudflare Workers, D1, R2)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @onelink/api",
+    "deploy": "npm run deploy -w @onelink/api",
+    "types": "npm run types -w @onelink/api",
+    "typecheck": "npm run types && npm run typecheck -w @onelink/api",
+    "test": "npm run test -w @onelink/api",
+    "db:create": "npm run db:create -w @onelink/api",
+    "db:migrate:local": "npm run db:migrate:local -w @onelink/api",
+    "db:migrate:remote": "npm run db:migrate:remote -w @onelink/api",
+    "db:seed:local": "npm run db:seed:local -w @onelink/api",
+    "db:seed:remote": "npm run db:seed:remote -w @onelink/api",
+    "db:seed:owner": "npm run db:seed:owner -w @onelink/api",
+    "db:seed:owner:remote": "npm run db:seed:owner:remote -w @onelink/api"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

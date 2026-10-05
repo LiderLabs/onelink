@@ -1,0 +1,17 @@
+# Copy to `.dev.vars` for local development:  copy .dev.vars.example .dev.vars
+# `.dev.vars` is gitignored. Never commit real secret values.
+
+# Environment label surfaced in API responses / logs.
+ENVIRONMENT=development
+
+# Origin of the admin SPA during local dev (Vite). Used for CORS in dev only.
+APP_ORIGIN=http://localhost:5173
+
+# Extra server-side pepper mixed into session token hashes.
+# Recommended so that a stolen DB alone cannot be replayed against the session store.
+SESSION_PEPPER=dev-only-pepper-change-me
+
+# Password used for the seeded owner account AND the password that
+# `npm run db:seed:owner` will hash into the database.
+OWNER_EMAIL=owner@onelink.local
+OWNER_PASSWORD=change-me-on-first-login

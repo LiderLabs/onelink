@@ -1,0 +1,27 @@
+node_modules/
+dist/
+build/
+coverage/
+
+# Cloudflare
+.wrangler/
+worker-configuration.d.ts
+
+# Secrets — never commit
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Generated / scratch
+scripts/.tmp/
+*.log
+npm-debug.log*
+# Local test-run captures (e.g. `npm test > vitest-out.txt`)
+vitest-out.txt
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

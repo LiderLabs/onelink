@@ -1,0 +1,60 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "onelink-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "triggers": {
+    "crons": ["0 3 * * *"]
+  },
+  "vars": {
+    // The COMMITTED default is production, deliberately. A deploy that forgets
+    // to configure anything must not inherit development affordances (the dev
+    // pepper, password-reset tokens echoed in response bodies), so the safe
+    // direction is the default rather than the exception. `lib/config.ts`
+    // fails closed on any unrecognised value, which makes a typo louder still.
+    //
+    // Local development is unaffected: `.dev.vars` takes precedence over `vars`
+    // and sets ENVIRONMENT=development. That file is gitignored, so this value
+    // is what actually ships.
+    "ENVIRONMENT": "production",
+
+    // Public origin of the deployment. The SPA is served by this same Worker,
+    // so this is not a CORS peer so much as the canonical self-reference, and
+    // it serves two jobs:
+    //
+    //   * the CORS allow-list, which is exactly this one origin
+    //     (`allowedOrigin()` in lib/http.ts), and
+    //   * the base URL of password-reset links (`buildPasswordResetUrl`), which
+    //     hard-codes the `/reset-password?token=…` path the SPA expects.
+    //
+    // Because the SPA and the API share one origin, `__Host-` session cookies
+    // work with SameSite=Lax and no custom domain. When a custom domain is
+    // added later, only this value changes — nothing in the code moves.
+    "APP_ORIGIN": "https://onelink-api.santan.workers.dev"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "onelink-db",
+      // Required for `--remote` commands and deploys; harmless locally, where
+      // Miniflare uses a local SQLite file instead.
+      "database_id": "eccb66c7-c0ba-4feb-80ce-f739830e8383",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PUBLIC_BUCKET",
+      "bucket_name": "onelink-public"
+    },
+    {
+      "binding": "PRIVATE_BUCKET",
+      "bucket_name": "onelink-private"
+    }
+  ]
+}
