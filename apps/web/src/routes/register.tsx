@@ -8,15 +8,7 @@ import { Button } from '../components/Button'
 import { Field } from '../components/Field'
 import { Notice } from '../components/Notice'
 
-// ============================================================================
-// /register
-//
-// The checks below mirror the server's rules (`src/validation/common.ts`) so a
-// mistyped username is caught before a round trip. They are a convenience, not a
-// boundary: the server validates the same way and stays the authority, and the
-// form is `noValidate` only so the browser's own bubbles do not pre-empt the
-// errors rendered next to each field.
-// ============================================================================
+
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9._-]+$/
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/

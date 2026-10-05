@@ -7,15 +7,21 @@ import { cx, stagger } from '../lib/css'
 // `error` and `warning` are assertive (`role="alert"`), `success` and `info` are
 // polite (`role="status"`). That distinction is deliberate: a rejected form must
 // interrupt a screen reader, while "your password was changed" should not.
+//
+// The tones stay distinguishable without hue by leaning on ink weight — the
+// darker the rule and the label, the louder the notice — so urgency is a property
+// of the type, not of colour. Only `error` is allowed to reach for `danger`, and
+// even there the label states the problem in words, so colour is never the sole
+// signal (WCAG 1.4.1).
 // ============================================================================
 
 export type NoticeTone = 'error' | 'warning' | 'success' | 'info'
 
 const TONES: Record<NoticeTone, { border: string; label: string; text: string }> = {
-  error: { border: 'border-l-vermilion', label: 'text-vermilion', text: 'Check this' },
-  warning: { border: 'border-l-amber', label: 'text-amber', text: 'Heads up' },
-  success: { border: 'border-l-sage', label: 'text-sage', text: 'Done' },
-  info: { border: 'border-l-ink-faint', label: 'text-ink-soft', text: 'Note' },
+  error: { border: 'border-l-danger', label: 'text-danger', text: 'Check this' },
+  warning: { border: 'border-l-ink', label: 'text-ink', text: 'Heads up' },
+  success: { border: 'border-l-ink-faint', label: 'text-ink-soft', text: 'Done' },
+  info: { border: 'border-l-rule', label: 'text-ink-faint', text: 'Note' },
 }
 
 export interface NoticeProps {

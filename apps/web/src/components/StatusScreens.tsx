@@ -41,7 +41,7 @@ export function UnavailableScreen() {
 
   return (
     <div className="mx-auto max-w-xl">
-      <p className="eyebrow text-vermilion">Connection problem</p>
+      <p className="eyebrow text-danger">Connection problem</p>
       <h1 className="mt-3 font-display text-4xl font-medium leading-tight">
         {platformName} did not answer
       </h1>

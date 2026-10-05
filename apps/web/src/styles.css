@@ -1,28 +1,31 @@
 @import 'tailwindcss';
 
 /* ============================================================================
-   OneLink — "ink on paper".
+   OneLink — "ink on paper", in black and white.
 
    The product is a link page: typographic, printed, personal. So the surface is
-   paper, the voice is a broadsheet, and the only structural devices are rules,
-   stamps and a single vermilion accent. No glassmorphism, no gradient mesh, no
+   a white sheet, the voice is a broadsheet, and the only structural devices are
+   rules, stamps and weight — no tinted surfaces, no gradient mesh, no
    rounded-everything: those read as "generic dashboard", which is precisely the
    register this interface should not have.
+
+   `danger` is the one chromatic token left, and it is reserved for failed
+   states: an invalid field, a refused request, a suspended account. Every other
+   distinction — warning, success, info — is drawn with ink weight instead. See
+   the tone ladder in components/Notice.tsx.
 
    Tokens live here (Tailwind v4 CSS-first config) so `bg-paper`, `text-ink`,
    `font-display` etc. are generated from one source of truth.
    ========================================================================== */
 @theme {
-  --color-paper: #f4f1e7;
-  --color-paper-deep: #e9e4d6;
-  --color-card: #fbf9f3;
-  --color-ink: #16170f;
-  --color-ink-soft: #4b4d3e;
-  --color-ink-faint: #8b8d78;
-  --color-rule: #cdc7b3;
-  --color-vermilion: #cf3a12;
-  --color-sage: #5c6f4f;
-  --color-amber: #9c6410;
+  --color-paper: #ffffff;
+  --color-paper-deep: #f1f1f1;
+  --color-card: #ffffff;
+  --color-ink: #000000;
+  --color-ink-soft: #3f3f3f;
+  --color-ink-faint: #6f6f6f;
+  --color-rule: #d6d6d6;
+  --color-danger: #c1121f;
 
   --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
   --font-sans: 'Archivo', ui-sans-serif, system-ui, sans-serif;
@@ -41,10 +44,8 @@
     font-family: var(--font-sans);
     font-feature-settings: 'ss01' 1;
     min-height: 100vh;
-    /* A faint diagonal wash so large empty areas are not flat colour. */
-    background-image:
-      radial-gradient(120% 80% at 100% 0%, rgba(207, 58, 18, 0.07), transparent 60%),
-      radial-gradient(90% 70% at 0% 100%, rgba(92, 111, 79, 0.09), transparent 55%);
+    /* One neutral wash so large empty areas are not flat colour. */
+    background-image: radial-gradient(120% 80% at 100% 0%, rgba(0, 0, 0, 0.035), transparent 60%);
     background-attachment: fixed;
   }
 
@@ -54,7 +55,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-vermilion);
+    outline: 2px solid var(--color-ink);
     outline-offset: 2px;
     border-radius: 1px;
   }
@@ -68,7 +69,7 @@
     z-index: 60;
     pointer-events: none;
     mix-blend-mode: multiply;
-    opacity: 0.55;
+    opacity: 0.4;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.32'/%3E%3C/svg%3E");
   }
 }
@@ -99,11 +100,13 @@
   opacity: 0.85;
 }
 
-/* Account-panel card: paper with a hard offset shadow, like a paste-up. */
+/* Account-panel card: white with a hard black rule and offset shadow, like a
+   paste-up. The black border is load-bearing — with the cream tint gone, a white
+   plate on a white page has nothing but its shadow to sit on otherwise. */
 .plate {
   background-color: var(--color-card);
-  border: 1px solid var(--color-rule);
-  box-shadow: 6px 6px 0 rgba(22, 23, 15, 0.08);
+  border: 1px solid var(--color-ink);
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.1);
 }
 
 /* --------------------------------------------------------------- motion --- */

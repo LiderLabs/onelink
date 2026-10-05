@@ -8,6 +8,11 @@ import { cx } from '../lib/css'
 // hand: every submit here talks to the network, and a form that can be
 // double-submitted (creating two accounts, or two reset consumptions) is a bug,
 // so the disabled + aria-busy pairing lives in the component.
+//
+// `variant` is where the monochrome palette shows up: `solid` is a black bar, and
+// with no accent hue left to spend on a hover state it inverts to white-on-black
+// instead — a darker shade of black would be indistinguishable from the resting
+// state.
 // ============================================================================
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -36,7 +41,7 @@ export function Button({
         'border transition-[background-color,color,border-color,transform] duration-150',
         'active:translate-y-px disabled:cursor-not-allowed disabled:opacity-55',
         variant === 'solid'
-          ? 'border-ink bg-ink text-paper hover:border-vermilion hover:bg-vermilion'
+          ? 'border-ink bg-ink text-paper hover:bg-paper hover:text-ink'
           : 'border-rule bg-transparent text-ink hover:border-ink hover:bg-paper-deep',
         className,
       )}

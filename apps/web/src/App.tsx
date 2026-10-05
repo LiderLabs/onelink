@@ -8,18 +8,7 @@ import { ProfileRoute } from './routes/profile'
 import { RegisterRoute } from './routes/register'
 import { ResetPasswordRoute } from './routes/reset-password'
 
-// ============================================================================
-// Routes.
-//
-// Everything is nested inside the shell so the masthead, maintenance advisory
-// and suspension notice cannot be forgotten by a screen.
-//
-// The two reset screens are deliberately unguarded: someone following a reset
-// link may or may not still have a session, and consuming the token is what
-// determines the outcome. Only the sign-in and sign-up screens are hidden from
-// an authenticated visitor, because rendering a login form to someone who is
-// already signed in is the classic pre-auth bootstrap flash.
-// ============================================================================
+
 
 export function App() {
   return (

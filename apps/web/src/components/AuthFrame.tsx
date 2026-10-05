@@ -47,7 +47,7 @@ export function AuthFrame({
         </h1>
 
         <div
-          className="sweep mt-7 h-[3px] w-24 origin-left bg-vermilion"
+          className="sweep mt-7 h-[3px] w-24 origin-left bg-ink"
           style={stagger(2)}
           aria-hidden="true"
         />

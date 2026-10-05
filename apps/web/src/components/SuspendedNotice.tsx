@@ -18,8 +18,8 @@ export function SuspendedNotice({ user }: { user: SessionUser }) {
     : `until ${formatDateTime(user.suspendedUntil)} (${formatRelative(user.suspendedUntil)})`
 
   return (
-    <div role="alert" className="mt-6 border-l-2 border-l-vermilion bg-vermilion/8 py-4 pl-4 pr-3">
-      <p className="eyebrow text-vermilion">
+    <div role="alert" className="mt-6 border-l-2 border-l-danger bg-ink/5 py-4 pl-4 pr-3">
+      <p className="eyebrow text-danger">
         {user.status === 'banned' ? 'Account banned' : 'Account suspended'}
       </p>
       <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">

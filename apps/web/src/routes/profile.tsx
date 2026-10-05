@@ -8,14 +8,7 @@ import { Field } from '../components/Field'
 import { Notice } from '../components/Notice'
 import { Splash } from '../components/StatusScreens'
 
-// ============================================================================
-// The password-change form.
-//
-// It is the *only* thing a user with `requirePasswordChange` can do: the API
-// answers 403 MUST_CHANGE_PASSWORD on every other authenticated route until it
-// is satisfied. So `forced` is not a stylistic flag — it changes what this form
-// claims about itself, and the surrounding screen drops its alternatives.
-// ============================================================================
+
 
 const MIN_PASSWORD_LENGTH = 8
 const MAX_PASSWORD_LENGTH = 200

@@ -44,7 +44,7 @@ export function Field({ label, hint, error, delay = 0, id, className, ...rest }:
           'w-full border-b bg-transparent pb-2 pt-1 text-lg text-ink',
           'placeholder:font-sans placeholder:text-ink-faint',
           'transition-colors duration-150 focus:border-ink focus:outline-none',
-          error ? 'border-vermilion' : 'border-rule',
+          error ? 'border-danger' : 'border-rule',
           className,
         )}
       />
@@ -54,7 +54,7 @@ export function Field({ label, hint, error, delay = 0, id, className, ...rest }:
         </p>
       ) : null}
       {error ? (
-        <p id={errorId} className="mt-2 text-xs font-medium text-vermilion">
+        <p id={errorId} className="mt-2 text-xs font-medium text-danger">
           {error}
         </p>
       ) : null}

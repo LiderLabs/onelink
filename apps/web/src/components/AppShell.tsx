@@ -63,9 +63,9 @@ export function AppShell() {
       </header>
 
       {maintenanceEnabled ? (
-        <div role="status" className="border-b border-amber/40 bg-amber/10">
+        <div role="status" className="border-b border-ink/15 bg-ink/5">
           <p className="mx-auto max-w-5xl px-5 py-3 text-sm text-ink">
-            <span className="eyebrow mr-3 text-amber">Read-only</span>
+            <span className="eyebrow mr-3 text-ink">Read-only</span>
             {maintenanceMessage && maintenanceMessage.length > 0
               ? maintenanceMessage
               : 'OneLink is in maintenance mode. You can sign in, but changes are paused.'}

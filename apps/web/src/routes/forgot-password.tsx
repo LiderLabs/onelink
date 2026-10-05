@@ -9,19 +9,7 @@ import { Button } from '../components/Button'
 import { Field } from '../components/Field'
 import { Notice } from '../components/Notice'
 
-// ============================================================================
-// /forgot-password
-//
-// The API answers 200 with the same body whether or not the address exists, on
-// purpose: anything else would turn this into a "does this person have an
-// account here" oracle for a word list. So the UI can never honestly say
-// "no such account", and it does not pretend to.
-//
-// Outside production the API also returns `devToken`, because no mail provider
-// is wired up yet and the flow would otherwise be impossible to complete. When
-// that field is present this screen shows the link explicitly and says why,
-// rather than implying an email is on its way.
-// ============================================================================
+
 
 export function ForgotPasswordRoute() {
   const session = useSession()
@@ -89,7 +77,7 @@ export function ForgotPasswordRoute() {
               <p className="mt-3">
                 <Link
                   to={devLink}
-                  className="break-all font-mono text-xs text-vermilion underline decoration-dotted underline-offset-4"
+                  className="break-all font-mono text-xs text-ink underline decoration-dotted underline-offset-4"
                 >
                   {devLink}
                 </Link>

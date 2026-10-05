@@ -9,18 +9,7 @@ import { Button } from '../components/Button'
 import { Field } from '../components/Field'
 import { Notice } from '../components/Notice'
 
-// ============================================================================
-// /reset-password?token=…
-//
-// The token arrives in the query string — that is the shape the API's reset
-// links use (`buildPasswordResetUrl` hard-codes this path). It is read once and
-// posted as a body field; nothing else in the app reads `location.search` for a
-// secret.
-//
-// A successful reset revokes every session, so the caller is signed out; this
-// screen re-reads the session afterwards so the shell stops showing an identity
-// that no longer has a cookie behind it.
-// ============================================================================
+
 
 const MIN_PASSWORD_LENGTH = 8
 const MAX_PASSWORD_LENGTH = 200

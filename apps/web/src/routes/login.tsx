@@ -9,16 +9,7 @@ import { Field } from '../components/Field'
 import { Notice } from '../components/Notice'
 import { safeNext } from '../components/Guards'
 
-// ============================================================================
-// /login
-//
-// One identifier field, because the API takes a username *or* an email address
-// and branching on `@` server-side is not something a user should have to think
-// about. No client-side validation is attempted beyond "not empty": the endpoint
-// deliberately accepts a loosely-formed identifier so that it cannot be used to
-// probe which addresses exist, and a client-side format check would only invent
-// a rule the server does not enforce.
-// ============================================================================
+
 
 export function LoginRoute() {
   const session = useSession()
