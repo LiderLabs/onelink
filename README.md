@@ -150,6 +150,7 @@ npx @playwright/cli run-code --filename=scripts/browser/profile-photo-image-chec
 npx @playwright/cli run-code --filename=scripts/browser/profile-photo-flow-check.js
 npx @playwright/cli run-code --filename=scripts/browser/profile-photo-ui-check.js
 npx @playwright/cli run-code --filename=scripts/browser/profile-photo-state-check.js
+npx @playwright/cli run-code --filename=scripts/browser/profile-photo-response-check.js
 ```
 
 The flow check creates a disposable local account used by the UI check.

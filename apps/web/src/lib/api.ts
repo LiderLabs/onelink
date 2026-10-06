@@ -186,7 +186,13 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
 
   if (response.status === 204) return undefined as T
 
-  const raw = await response.text()
+  let raw: string
+  try {
+    raw = await response.text()
+  } catch {
+    // The write may already have committed even when its response stream fails.
+    throw new ApiError(0, 'NETWORK', 'OneLink could not be reached.')
+  }
   let payload: unknown = null
   if (raw.length > 0) {
     try {
