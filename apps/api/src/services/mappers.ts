@@ -1,6 +1,7 @@
 import type {
   ApiUser,
   AuthUser,
+  MediaAssetRow,
   PageLinkRow,
   PageRow,
   SanctionRow,
@@ -9,6 +10,7 @@ import type {
   UserRow,
   UserSocialLinkRow,
 } from '../types'
+import { mediaUrlFor } from '../lib/media'
 
 // ============================================================================
 // Row -> DTO mapping. Kept in one place so every endpoint exposes the same
@@ -30,6 +32,9 @@ export function toApiUser(row: UserRow): ApiUser {
     location: row.location ?? null,
     pronouns: row.pronouns ?? null,
     avatarKey: row.avatar_key,
+    // R1.3: derived from the key, never stored, so a client reads one field and never
+    // has to know how a media URL is shaped. `null` when there is no avatar.
+    avatarUrl: row.avatar_key ? mediaUrlFor(row.avatar_key) : null,
     role: row.role,
     status: row.status,
     statusReason: row.status_reason,
@@ -230,5 +235,40 @@ export function toSocialLinkDto(row: UserSocialLinkRow): Record<string, unknown>
     isVisible: row.is_visible === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  }
+}
+
+// ------------------------------------------------------------------- media --
+
+/**
+ * A stored media asset as `POST /api/v1/media` answers (R1.3).
+ *
+ * Exactly the six fields ROADMAP §R1.3 names. What is deliberately absent:
+ *
+ *   * `ownerUserId` and `uploadedBy` — this endpoint only ever returns the caller's
+ *     own upload, so an id that is always the caller's tells them nothing (the
+ *     `/pages/mine` lesson).
+ *   * `mime` — the type is a property of the bytes, and the bytes are fetchable at
+ *     `url` with that `content-type`; echoing it invites a client to store a second
+ *     copy of a fact the response already carries in a header.
+ *   * `status`, `pageId`, `deletedAt` — internal bookkeeping. A `deleted` asset is a
+ *     row that no longer answers at all (`DELETE` removes it), so there is no state
+ *     for a client to read here.
+ *   * `checksum` — operational (it is how a future pass finds duplicate objects); no
+ *     client has a use for it, and exposing it would look like a verification
+ *     contract this API does not offer.
+ *
+ * `key` IS present, and is the same string `PATCH /auth/me { avatarKey }` takes and
+ * `url` ends with: the client is trusted with the object's identity, not with its
+ * construction.
+ */
+export function toMediaAssetDto(row: MediaAssetRow): Record<string, unknown> {
+  return {
+    id: row.id,
+    key: row.r2_key,
+    url: mediaUrlFor(row.r2_key),
+    width: row.width,
+    height: row.height,
+    bytes: row.size_bytes,
   }
 }

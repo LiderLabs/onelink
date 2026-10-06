@@ -158,6 +158,52 @@ export async function api<T = unknown>(
   }
 }
 
+/**
+ * The same as `api`, for the one endpoint whose body is not JSON (R1.3).
+ *
+ * The bytes go out verbatim and `content-type` is only set when the caller names
+ * one — a request that declares no type at all is a real case the media route has
+ * to answer, so the helper must be able to send one.
+ */
+export async function apiBytes<T = unknown>(
+  method: string,
+  path: string,
+  options: {
+    bytes: Uint8Array
+    contentType?: string | null
+    cookie?: string | null
+    headers?: Record<string, string>
+  },
+): Promise<ApiResult<T>> {
+  const headers = new Headers()
+  if (options.contentType) headers.set('content-type', options.contentType)
+  if (options.cookie) headers.set('cookie', options.cookie)
+  for (const [name, value] of Object.entries(options.headers ?? {})) headers.set(name, value)
+
+  const response = await app.request(
+    `http://localhost${path}`,
+    { method, headers, body: options.bytes },
+    env,
+  )
+  const text = await response.text()
+
+  let body: unknown = null
+  if (text.length > 0) {
+    try {
+      body = JSON.parse(text)
+    } catch {
+      body = text
+    }
+  }
+
+  return {
+    status: response.status,
+    body: body as T,
+    headers: response.headers,
+    setCookie: response.headers.get('set-cookie'),
+  }
+}
+
 /** Logs in and returns the `name=value` cookie to replay on later requests. */
 export async function loginAs(
   user: Pick<SeededUser, 'username' | 'password'>,

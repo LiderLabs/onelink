@@ -7,6 +7,7 @@ import { ulid } from '../lib/ids'
 import { andWhere, asCount, likeContains } from '../lib/query'
 import { assertCanEditUser, assertCanGrantRole, assertCanModerateUser } from '../lib/rbac'
 import { actorLabelOf, auditInsertStmt } from './audit.service'
+import { assertOwnsAvatarKey } from './media.service'
 import { toApiUser, toNoteDto, toSanctionDto, toSessionDto } from './mappers'
 import {
   assertPasswordAcceptable,
@@ -539,6 +540,13 @@ export interface UpdateProfileInput {
   bio?: string | null | undefined
   location?: string | null | undefined
   pronouns?: string | null | undefined
+  /**
+   * R1.3. `undefined` = "not in the body", `null` = "clear it", a string = "point
+   * at this object". The string is a key and never a URL: the route's schema
+   * checked its shape, and this function checks that the caller OWNS it before
+   * anything is written — a key is only as trustworthy as the row behind it.
+   */
+  avatarKey?: string | null | undefined
   username?: string | undefined
 }
 
@@ -612,6 +620,19 @@ export async function updateOwnProfile(
     const pronouns =
       input.pronouns === null ? null : sanitizeSingleLine(input.pronouns, MAX_PRONOUNS_LENGTH) || null
     setField('pronouns', pronouns, 'pronouns')
+  }
+  if (input.avatarKey !== undefined) {
+    // R1.3. The SHAPE was checked by `avatarKeySchema`; ownership cannot be, so it
+    // is settled here against `media_assets` before the key is trusted — otherwise
+    // a caller could point their own profile at somebody else's upload simply by
+    // copying a key out of a public page. `null` is "no avatar" and needs no check.
+    //
+    // Replacing an avatar does NOT delete the one it replaced: this endpoint
+    // changes which object the account POINTS AT, and `DELETE /media/:id` removes
+    // an object. Folding a delete in here would make a profile save silently
+    // destroy a file the same account may have just uploaded on purpose.
+    if (input.avatarKey !== null) await assertOwnsAvatarKey(db, actor.id, input.avatarKey)
+    setField('avatar_key', input.avatarKey, 'avatarKey')
   }
   if (input.username !== undefined) {
     const username = normalizeUsername(input.username)

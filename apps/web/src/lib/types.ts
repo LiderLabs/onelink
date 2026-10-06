@@ -32,6 +32,13 @@ export interface PublicUser {
   location: string | null
   pronouns: string | null
   avatarKey: string | null
+  /**
+   * R1.3: the public URL of the avatar, derived from `avatarKey` by the API
+   * (`mediaUrlFor`) and `null` when the account has none. Read this instead of
+   * building one — where a media object is served from is the server's business,
+   * which is what lets the bucket move to a custom domain without a client release.
+   */
+  avatarUrl: string | null
   role: Role
   status: UserStatus
   statusReason: string | null

@@ -254,3 +254,59 @@ export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number]
  * asked to tune it yet.
  */
 export const MAX_SOCIAL_LINKS_PER_USER = 20
+
+// --------------------------------------------------------------------- media --
+/**
+ * The media kinds `POST /api/v1/media` will store (R1.3).
+ *
+ * A deliberate SUBSET of the CHECK in `0001_init.sql`, which also allows
+ * `report_evidence` and `appeal_evidence`. Those two are moderation material: they
+ * belong in `PRIVATE_BUCKET`, they are uploaded by an internal path that does not
+ * exist yet (Release 2/3), and they must never be servable by URL. Keeping them out
+ * of this list is what makes "the public bucket holds avatars and page images, and
+ * nothing else" a property of the code rather than of a caller's goodwill — the
+ * route cannot name them, and the serving route's key whitelist (`lib/media.ts`)
+ * cannot resolve them.
+ *
+ * `avatar` is what `users.avatar_key` points at; `page_image` is what R1.5's
+ * `page_links.thumbnail_key` will point at. Both are the same operation — store
+ * these bytes, remember how big they were — which is why one endpoint serves both.
+ */
+export const MEDIA_KINDS = ['avatar', 'page_image'] as const
+export type MediaKind = (typeof MEDIA_KINDS)[number]
+
+/**
+ * Byte cap for one upload (R1.3): 192 KiB.
+ *
+ * Deliberately UNDER `MAX_BODY_BYTES` (256 KiB, `app.ts`). The global guard is the
+ * outer net for every route and can only answer a generic "body too large"; this is
+ * the media policy, and it is the limit a client normally meets, because its message
+ * is the one that can name a number and tell the client to resize. Only the band
+ * between the two caps is decided by which check fires — and a client that is told
+ * to resize is a client that stops guessing.
+ *
+ * **D4** is why this is comfortable: the browser crops and re-encodes before
+ * uploading, so a 512×512 WebP avatar is ~30 KiB. This is headroom, not a target.
+ */
+export const MAX_MEDIA_BYTES = 192 * 1024
+
+/**
+ * Pixel cap for one upload (R1.3).
+ *
+ * Bytes are what the platform pays for; pixels are what a *visitor's browser* pays
+ * for, and the two are unrelated: a 60000×60000 PNG is 60 bytes in the header and
+ * four gigabytes decoded, on the page of every visitor (R1.7). Capping bytes cannot
+ * catch that, which is the whole reason this exists. It is a decompression-bomb
+ * backstop, not a quality target — the real limit is `MAX_MEDIA_BYTES`, and **D4**'s
+ * browser crop means a stored image is normally 512 px square.
+ */
+export const MAX_MEDIA_DIMENSION = 4096
+
+/**
+ * Longest `filename` query value the upload route keeps (R1.3).
+ *
+ * A label on the audit row and nothing else: the stored key is generated from the
+ * owner's id, never derived from what the client called the file, so no path ever
+ * contains this value — which is why it is a bound and not a sanitiser.
+ */
+export const MAX_MEDIA_FILENAME_LENGTH = 120

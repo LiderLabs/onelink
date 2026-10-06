@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { env } from 'cloudflare:workers'
 import { MAX_BIO_LENGTH, MAX_DISPLAY_NAME_LENGTH, MAX_LOCATION_LENGTH, MAX_PRONOUNS_LENGTH } from '../src/lib/constants'
 import { ulid } from '../src/lib/ids'
+import { mediaUrlFor } from '../src/lib/media'
 import type { ApiUser, AuthUser } from '../src/types'
 import {
   TEST_PASSWORD,
@@ -411,5 +412,65 @@ describe('PATCH /api/v1/auth/me', () => {
     // Counters are per actor as well as per rule: one abusive form must not
     // exhaust anybody else's allowance.
     expect((await updateProfile(otherCookie, { displayName: 'Ada' })).status).toBe(200)
+  })
+})
+
+// ============================================================================
+// The same endpoint, one field at a time: `avatarKey` (R1.3).
+//
+// `media.api.spec.ts` owns the upload/delete side and the ownership check that
+// needs a row in `media_assets`. What is left for this file is the part of the
+// field that is pure write-path: the SHAPE (refused before any query) and the
+// `undefined` vs `null` distinction ("not in this body" vs "clear it"), which a
+// test that always sends a key can never see.
+// ============================================================================
+
+describe('PATCH /api/v1/auth/me { avatarKey } (R1.3)', () => {
+  /** A key shaped exactly like the ones `POST /api/v1/media` mints. */
+  function avatarKeyFor(ownerId: string): string {
+    return `avatars/${ownerId}/${ulid()}.webp`
+  }
+
+  it('refuses a key that is not shaped like one this API mints', async () => {
+    const user = await createTestUser()
+    const cookie = await loginAs(user)
+
+    // `avatarKeySchema` (`validation/profile.schema.ts`) is the only thing that has
+    // to reject this: `nyancat.gif` cannot be an avatar anywhere, whatever the
+    // database happens to hold, and a shape check is free where a query is not.
+    const response = await updateProfile(cookie, { avatarKey: 'nyancat.gif' })
+
+    expect(response.status).toBe(422)
+    expect(errorOf(response).error.code).toBe('VALIDATION_ERROR')
+
+    const row = await env.DB.prepare('SELECT avatar_key FROM users WHERE id = ?')
+      .bind(user.id)
+      .first<{ avatar_key: string | null }>()
+    expect(row?.avatar_key).toBeNull()
+    expect(await profileAudits()).toHaveLength(0)
+  })
+
+  it('leaves the avatar alone when the body does not mention it', async () => {
+    // The distinction the whole field rides on: `undefined` means "not in this
+    // request", `null` means "clear it" — so a rename must not silently unset an
+    // avatar, and the request must not have to re-send a key it does not change.
+    // Seeded with SQL on purpose: this file is about the write path, and putting a
+    // key here for real is `media.api.spec.ts`'s job.
+    const user = await createTestUser()
+    const cookie = await loginAs(user)
+    const key = avatarKeyFor(user.id)
+    await env.DB.prepare('UPDATE users SET avatar_key = ? WHERE id = ?').bind(key, user.id).run()
+
+    const response = await updateProfile(cookie, { bio: 'Still here.' })
+
+    expect(response.status).toBe(200)
+    expect(response.body.data.user.avatarKey).toBe(key)
+    // Derived from the key on the way out, never stored: one field to read, no
+    // client ever has to know how a media URL is shaped.
+    expect(response.body.data.user.avatarUrl).toBe(mediaUrlFor(key))
+
+    // ...and the audit names the field the request actually changed.
+    const audits = await profileAudits()
+    expect(JSON.parse(audits[0]?.after ?? '{}')).toEqual({ bio: 'Still here.' })
   })
 })

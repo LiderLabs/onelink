@@ -8,6 +8,10 @@ import {
   MAX_URL_LENGTH,
   SOCIAL_PLATFORMS,
 } from '../lib/constants'
+// The key bound and the key shape come from `lib/media.ts`, beside the pattern that
+// defines them: a bound on a media key belongs with the code that mints one, not
+// with the constants that describe the profile around it.
+import { AVATAR_KEY_PATTERN, MAX_MEDIA_KEY_LENGTH } from '../lib/media'
 import { idParamSchema, usernameSchema } from './common'
 
 // ============================================================================
@@ -64,6 +68,26 @@ export const pronounsSchema = z
   .max(MAX_PRONOUNS_LENGTH, `Pronouns must be at most ${MAX_PRONOUNS_LENGTH} characters.`)
 
 /**
+ * The avatar an account points at (R1.3).
+ *
+ * `null` clears it, and that is the whole "remove my avatar" action. A string must
+ * LOOK like an avatar key this API minted — `avatars/{userId}/{ulid}.{ext}`, the
+ * shape `lib/media.ts` builds and serves — so a client that sends a URL, a bare
+ * filename, or another kind's key is told immediately instead of storing a key that
+ * would render as a broken image.
+ *
+ * The shape is only half the check. Ownership is answered in the service
+ * (`updateOwnProfile` asks `media_assets` whether this caller owns that key), because
+ * no pattern can prove ownership and the service should not have to parse a key in
+ * order to reject `"nyancat.gif"`.
+ */
+export const avatarKeySchema = z
+  .string()
+  .trim()
+  .max(MAX_MEDIA_KEY_LENGTH, `Avatar keys must be at most ${MAX_MEDIA_KEY_LENGTH} characters.`)
+  .regex(AVATAR_KEY_PATTERN, 'That is not an avatar key.')
+
+/**
  * `username` is optional but never nullable: an account always has one, and
  * "no username" is not a state `users.username` can hold.
  *
@@ -78,10 +102,11 @@ export const updateProfileSchema = z
     bio: bioSchema.nullable().optional(),
     location: locationSchema.nullable().optional(),
     pronouns: pronounsSchema.nullable().optional(),
+    avatarKey: avatarKeySchema.nullable().optional(),
     username: usernameSchema.optional(),
     // R1.2 added `location` and `pronouns` above, exactly as R1.1 promised.
-    // R1.3 lands `avatarKey`, which must be checked against `media_assets`
-    // ownership in the service before it is ever trusted.
+    // R1.3 lands `avatarKey`: the SHAPE is checked here, ownership against
+    // `media_assets` is checked in the service before the key is ever trusted.
   })
   .refine((value) => Object.keys(value).length > 0, {
     error: 'Supply at least one field to update.',

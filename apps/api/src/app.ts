@@ -18,6 +18,7 @@ import { publicRoutes } from './routes/public'
 import { authRoutes } from './routes/auth'
 import { pageRoutes } from './routes/pages'
 import { profileRoutes } from './routes/profile'
+import { mediaRoutes } from './routes/media'
 import { userRoutes } from './routes/users'
 import { settingsRoutes } from './routes/settings'
 import { auditRoutes } from './routes/audit'
@@ -110,6 +111,12 @@ export function createApp() {
   app.route('/api/v1/auth', authRoutes)
   app.route('/api/v1/pages', pageRoutes)
   app.route('/api/v1/profile', profileRoutes)
+  // R1.3. Deliberately NOT under /admin: an avatar is a self-service object, so
+  // this is mounted beside `/profile` and guarded by ownership rather than by a
+  // capability. The serving route beneath it is public on purpose — an avatar
+  // appears on a public page (R1.7), and the key whitelist in `lib/media.ts` is
+  // what keeps that from meaning "the public bucket is browsable".
+  app.route('/api/v1/media', mediaRoutes)
   app.route('/api/v1/admin/users', userRoutes)
   app.route('/api/v1/admin/settings', settingsRoutes)
   app.route('/api/v1/admin/audit-logs', auditRoutes)

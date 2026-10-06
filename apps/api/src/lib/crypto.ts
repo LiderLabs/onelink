@@ -85,11 +85,27 @@ async function sha256Bytes(input: string): Promise<Uint8Array> {
   return new Uint8Array(digest)
 }
 
-export async function sha256Hex(input: string): Promise<string> {
-  const bytes = await sha256Bytes(input)
+function hexOf(bytes: Uint8Array): string {
   let hex = ''
   for (const byte of bytes) hex += byte.toString(16).padStart(2, '0')
   return hex
+}
+
+export async function sha256Hex(input: string): Promise<string> {
+  return hexOf(await sha256Bytes(input))
+}
+
+/**
+ * SHA-256 of raw bytes, hex-encoded (R1.3).
+ *
+ * A sibling of `sha256Hex` rather than a widened parameter type: that one hashes
+ * TEXT, and `media_assets.checksum` is the digest of a file exactly as it was
+ * stored. Encoding the bytes to a string first would make the column a digest of
+ * an encoding decision instead of a digest of the object — and the object is what
+ * a later duplicate sweep would be comparing.
+ */
+export async function sha256HexOfBytes(bytes: Uint8Array): Promise<string> {
+  return hexOf(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
 }
 
 /**

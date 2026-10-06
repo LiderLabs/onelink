@@ -140,6 +140,38 @@ export interface UserSocialLinkRow {
   updated_at: number
 }
 
+/**
+ * `media_assets` as stored (0001). Column names are the migration's, as everywhere
+ * else: the service reads and writes them directly, so a rename here would silently
+ * diverge from the SQL.
+ *
+ * `owner_user_id` is nullable because 0001 declares that FK `ON DELETE SET NULL`: a
+ * hard-deleted user leaves rows behind with no owner. Every ownership check therefore
+ * compares against the caller's id rather than trusting a non-null column.
+ * `width`/`height`/`checksum`/`deleted_at` are nullable because the table is shared
+ * with the private evidence kinds; R1.3 always fills the first three — it refuses
+ * bytes it cannot measure — and only ever reads rows with `status = 'active'`.
+ */
+export interface MediaAssetRow {
+  id: string
+  owner_user_id: string | null
+  page_id: string | null
+  r2_key: string
+  bucket: 'public' | 'private'
+  /** `avatar` | `page_image`, or a report/appeal evidence kind. The CHECK lists all four. */
+  kind: string
+  original_filename: string | null
+  mime: string
+  size_bytes: number
+  width: number | null
+  height: number | null
+  checksum: string | null
+  uploaded_by: string | null
+  status: 'active' | 'deleted'
+  created_at: number
+  deleted_at: number | null
+}
+
 export type PageStatus = 'draft' | 'published' | 'archived'
 /** Mirrors the CHECK in migrations/0001_init.sql — note there is no `flagged`. */
 export type PageModerationStatus = 'visible' | 'under_review' | 'removed'
@@ -249,6 +281,15 @@ export interface ApiUser {
   location: string | null
   pronouns: string | null
   avatarKey: string | null
+  /**
+   * R1.3: the servable URL of `avatarKey`, or `null` when there is no avatar.
+   *
+   * Derived, not stored — `toApiUser` builds it from the key, so a client never has
+   * to know how a media URL is shaped, and a future move to an R2 public domain is
+   * one function in `lib/media.ts` rather than a client release. Root-relative, so it
+   * is correct on any origin this API is served from.
+   */
+  avatarUrl: string | null
   role: Role
   status: UserStatus
   statusReason: string | null
