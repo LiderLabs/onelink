@@ -50,7 +50,7 @@ export function RequireAnonymous() {
   if (session.status === 'unavailable') return <UnavailableScreen />
   if (session.user) {
     const next = safeNext(new URLSearchParams(location.search).get('next'))
-    return <Navigate to={next ?? '/profile'} replace />
+    return <Navigate to={next ?? '/app/profile'} replace />
   }
 
   return <Outlet />

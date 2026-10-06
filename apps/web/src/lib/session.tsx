@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ApiError, api, isUnauthenticated } from './api'
-import type { PublicSettings, SessionUser } from './types'
+import type { PublicSettings, SessionUser, UpdateProfileInput } from './types'
 
 // ============================================================================
 // Session + platform state for the whole app.
@@ -44,6 +44,13 @@ export interface SessionContextValue extends SessionState {
   register: (input: RegisterInput) => Promise<SessionUser>
   logout: () => Promise<void>
   changePassword: (currentPassword: string, newPassword: string) => Promise<number>
+  /**
+   * `PATCH /auth/me` (R1.1/R1.2) and adoption of the answer.
+   *
+   * Resolves with the server's normalized identity, so the caller can reset its
+   * dirty baseline to what was actually stored rather than to what was typed.
+   */
+  updateProfile: (input: UpdateProfileInput) => Promise<SessionUser>
   can: (capability: string) => boolean
   /** True while the signed-in user must rotate their password before doing
    *  anything else — mirrors the API's MUST_CHANGE_PASSWORD interlock. */
@@ -66,6 +73,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // Invalidates in-flight loads when a newer one starts (React StrictMode's
   // double-invoke in development, or a login landing mid-bootstrap).
   const loadIdRef = useRef(0)
+  /**
+   * The latest state, readable from an async callback without making that
+   * callback depend on it. `updateProfile` needs the current user to merge the
+   * PATCH response over; re-creating the callback on every state change would
+   * invalidate every memo downstream for no reason.
+   */
+  const stateRef = useRef(state)
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   /**
    * One bootstrap pass: platform settings (valid signed in or out) plus the
@@ -200,6 +217,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [load, runAuthenticated],
   )
 
+  /**
+   * Adopts the identity the API just stored.
+   *
+   * The PATCH response is an `ApiUser`: it carries no `sessionId`,
+   * `sessionExpiresAt` or `impersonatedBy`, because those belong to the session
+   * and not to the account. Spreading it OVER the current session user keeps
+   * those three truthful — replacing the user with the response would silently
+   * blank the session expiry the account record prints and drop the
+   * impersonation flag the shell warns about.
+   *
+   * No second `GET /auth/me` afterwards: the write is already confirmed, and a
+   * failed follow-up read would look like a failed save and invite a duplicate
+   * submission. The server's normalized values are exactly what came back here.
+   */
+  const updateProfile = useCallback(
+    async (input: UpdateProfileInput): Promise<SessionUser> => {
+      const current = stateRef.current.user
+      if (!current) throw new ApiError(401, 'UNAUTHENTICATED', 'Authentication required.')
+
+      const result = await runAuthenticated(() => api.updateProfile(input))
+      const merged: SessionUser = { ...current, ...result.user }
+      setState((previous) => (previous.user ? { ...previous, user: merged } : previous))
+      return merged
+    },
+    [runAuthenticated],
+  )
+
   const value = useMemo<SessionContextValue>(
     () => ({
       ...state,
@@ -208,10 +252,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       changePassword,
+      updateProfile,
       can: (capability: string) => state.capabilities.includes(capability),
       mustChangePassword: state.user?.requirePasswordChange === true,
     }),
-    [state, load, login, register, logout, changePassword],
+    [state, load, login, register, logout, changePassword, updateProfile],
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

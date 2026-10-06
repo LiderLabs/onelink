@@ -5,6 +5,8 @@ import type {
   MeResponse,
   PublicSettings,
   ResetPasswordResponse,
+  UpdateProfileInput,
+  UpdateProfileResponse,
 } from './types'
 
 // ============================================================================
@@ -99,10 +101,62 @@ interface ErrorEnvelope {
 }
 
 /**
+ * One field-level problem from a `422 VALIDATION_ERROR`.
+ *
+ * The API answers a failed body with `details.issues`, each naming the path that
+ * failed (`"url"`, `"socialIds.2"`, `"(root)"`), so a form can attach the server's
+ * own message to the control it belongs to instead of dumping a paragraph above
+ * the whole form.
+ */
+export interface ValidationIssue {
+  path: string
+  message: string
+  code: string
+}
+
+/** The `details.issues` of a 422, or `[]` for every other kind of failure. */
+export function validationIssues(error: unknown): ValidationIssue[] {
+  if (!(error instanceof ApiError) || error.code !== 'VALIDATION_ERROR') return []
+  const issues = (error.details as { issues?: unknown } | null | undefined)?.issues
+  if (!Array.isArray(issues)) return []
+
+  const parsed: ValidationIssue[] = []
+  for (const issue of issues) {
+    if (typeof issue !== 'object' || issue === null) continue
+    const candidate = issue as { path?: unknown; message?: unknown; code?: unknown }
+    if (typeof candidate.message !== 'string') continue
+    parsed.push({
+      path: typeof candidate.path === 'string' ? candidate.path : '(root)',
+      message: candidate.message,
+      code: typeof candidate.code === 'string' ? candidate.code : '',
+    })
+  }
+  return parsed
+}
+
+/**
+ * The same issues keyed by field name, for binding onto inputs.
+ *
+ * First message per field wins: a field with two complaints does not have room
+ * for both, and the first is the one the schema checks first.
+ */
+export function fieldErrorsFrom(error: unknown): Record<string, string> {
+  const map: Record<string, string> = {}
+  for (const issue of validationIssues(error)) {
+    if (issue.path === '(root)' || issue.path in map) continue
+    map[issue.path] = issue.message
+  }
+  return map
+}
+
+/**
  * `fetch` with the shared envelope handling and a hard timeout, so a stalled
  * request cannot leave a screen spinning forever.
+ *
+ * Exported because feature clients (`features/<name>/api.ts`) build their own
+ * endpoints on top of it rather than every resource being bolted into this file.
  */
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response: Response
   try {
     response = await fetch(`${BASE}${path}`, {
@@ -158,6 +212,20 @@ export const api = {
   publicSettings: () => request<PublicSettings>('/public/settings'),
 
   me: () => request<MeResponse>('/auth/me'),
+
+  /**
+   * Self-service identity edit (R1.1, extended by R1.2).
+   *
+   * Answers `{ user }` and nothing else: the body that can change here cannot
+   * change a role, so capabilities are not echoed — the caller keeps its own.
+   * The `user` is an `ApiUser`, NOT an `AuthUser`, which is why the session
+   * merges it over the live session user instead of replacing it.
+   */
+  updateProfile: (input: UpdateProfileInput) =>
+    request<UpdateProfileResponse>('/auth/me', {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
 
   login: (identifier: string, password: string) =>
     request<AuthResponse>('/auth/login', {

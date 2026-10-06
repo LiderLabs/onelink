@@ -86,7 +86,7 @@ export function AppShell() {
       <footer className="border-t border-rule">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-5">
           <p className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-ink-faint">
-            {platformName} · admin console
+            {platformName} · console
           </p>
           <p className="font-mono text-[0.6875rem] tracking-[0.06em] text-ink-faint">
             sessions end 8 h after sign-in

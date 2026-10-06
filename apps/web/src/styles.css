@@ -109,6 +109,23 @@
   box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.1);
 }
 
+/* ---------------------------------------------------------------- dialog --- */
+
+/* The native <dialog> already supplies focus trapping, Escape handling, an inert
+   background and focus restoration. What it does not supply is our surface, so
+   the UA chrome is removed and the plate inside becomes the whole element. */
+dialog {
+  padding: 0;
+  border: none;
+  background: transparent;
+  max-width: none;
+  color: inherit;
+}
+
+dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.32);
+}
+
 /* --------------------------------------------------------------- motion --- */
 
 @keyframes rise {

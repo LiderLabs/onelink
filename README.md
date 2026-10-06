@@ -17,9 +17,10 @@ apps/api
   test/            vitest suites (run inside workerd via @cloudflare/vitest-plugin)
 
 apps/web
-  src/lib          typed API client, session store, formatting
-  src/components   shell, auth frame, field/button/notice primitives
-  src/routes       login, register, forgot-password, reset-password, profile
+  src/lib          typed API client, session store, formatting, resource/dirty-form hooks
+  src/components   shell, console layout, auth frame, field/button/notice/dialog primitives
+  src/features     profile (identity, socials, security), public (slug layout)
+  src/routes       login, register, forgot-password, reset-password, profile, console 404
 ```
 
 The SPA is served by the API Worker itself (`assets.directory` in
@@ -72,12 +73,54 @@ copies the root file to `apps/api/.dev.vars` before starting wrangler
 testable without a mail provider). Both files are gitignored — never commit real
 secret values; `.dev.vars.example` is the committed template.
 
+## The web console
+
+The SPA is served by the API Worker itself, so both live on one origin. In
+development, browse `http://localhost:5173` — never the Worker's own port, where
+the `__Host-` session cookie does not exist.
+
+| Route | Screen |
+| --- | --- |
+| `/login`, `/register` | sign in, create an account |
+| `/forgot-password`, `/reset-password` | the reset flow (generated links use these) |
+| `/` | redirects to `/app` |
+| `/app` | the console; redirects to `/app/profile` until "My pages" lands |
+| `/app/profile` | identity (display name, username, bio, location, pronouns), social links, password change, account record |
+| `/profile` | compatibility redirect to `/app/profile`, for old bookmarks |
+| `/:slug`, `/p/:slug` | the public page — layout only for now; the renderer is a later phase |
+| any unmatched path under `/app/` | a console 404 that cannot fall through to a slug |
+
+The profile screen is two resources wearing one screen, and they behave
+differently on purpose:
+
+- **Identity** is `PATCH /api/v1/auth/me` (R1.1/R1.2). Only changed fields are sent,
+  an emptied optional box is sent as `null`, and the response is *merged* over the
+  session user rather than replacing it — the PATCH answer is an `ApiUser` and
+  carries no `sessionId`, `sessionExpiresAt` or `impersonatedBy`.
+- **Social links** are `/api/v1/profile/socials` (R1.2): append, edit, reorder,
+  delete. Reordering uses Move up / Move down (no drag-and-drop this pass) and
+  submits every live id, hidden rows included.
+- The links section is **not requested at all** for a suspended account or a
+  session with an outstanding forced password change: that endpoint answers `403`
+  for both, and a deliberate refusal is not an error worth rendering. An
+  impersonated session may read the links and may not write them.
+
+Unsaved edits are protected in both directions: in-app navigation asks first
+(React Router's blocker, which is why the app mounts `createBrowserRouter`), and
+closing the tab warns. A successful save resets the dirty baseline to the server's
+normalized values, so the second submit diffs against what is actually stored.
+
 ## Tests and typecheck
 
 ```bash
-npm test          # 94 API tests, run in workerd against a local D1
+npm test          # 171 API tests in 7 files, run in workerd against a local D1
 npm run typecheck # regenerates worker-configuration.d.ts, then typechecks both workspaces
 ```
+
+The API suites are the contract evidence for the SPA: the browser consumes those
+endpoints and their DTOs rather than re-testing them. `apps/web` has no test
+runner of its own, and `npm --workspace apps/web run build` (which runs
+`tsc --noEmit && vite build`) plus a browser pass are what verify it.
 
 `worker-configuration.d.ts` is generated and gitignored, so run typechecks from
 the root (the workspace script only runs `tsc`) or run `npm run types` first.

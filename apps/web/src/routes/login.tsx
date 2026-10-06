@@ -32,7 +32,7 @@ export function LoginRoute() {
       // Land on whatever guarded route sent us here, else the profile. A forced
       // password change is handled there — it is the only screen the API's
       // interlock admits.
-      navigate(next ?? '/profile', { replace: true })
+      navigate(next ?? '/app/profile', { replace: true })
     } catch (caught) {
       setError(errorMessageFor(caught))
       setPassword('')

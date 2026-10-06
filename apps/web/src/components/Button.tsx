@@ -18,7 +18,7 @@ import { cx } from '../lib/css'
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   pending?: boolean
   pendingLabel?: string
-  variant?: 'solid' | 'outline'
+  variant?: 'solid' | 'outline' | 'danger'
 }
 
 export function Button({
@@ -40,9 +40,13 @@ export function Button({
         'font-mono text-xs uppercase tracking-[0.18em]',
         'border transition-[background-color,color,border-color,transform] duration-150',
         'active:translate-y-px disabled:cursor-not-allowed disabled:opacity-55',
-        variant === 'solid'
-          ? 'border-ink bg-ink text-paper hover:bg-paper hover:text-ink'
-          : 'border-rule bg-transparent text-ink hover:border-ink hover:bg-paper-deep',
+        variant === 'solid' && 'border-ink bg-ink text-paper hover:bg-paper hover:text-ink',
+        variant === 'outline' && 'border-rule bg-transparent text-ink hover:border-ink hover:bg-paper-deep',
+        // The one chromatic variant, reserved for an irreversible action
+        // (UI-ROADMAP ground rule 3 / spec §4) — a filled black button and a
+        // "Delete" label read as ordinary once they sit in a row of others.
+        variant === 'danger' &&
+          'border-danger bg-danger text-paper hover:bg-paper hover:text-danger',
         className,
       )}
     >

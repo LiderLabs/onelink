@@ -23,6 +23,15 @@ Verified against commit `1e5db86` (`feat(api): owner-facing pages and links API`
 
 Status markers: ✅ done · 🔨 next · ⏳ planned · 🎨 UI (deferred) · 📦 Release 2.
 
+> **UI sequencing is planned separately.** `UI-ROADMAP.md` splits the single R1.8 UI pass
+> into user-facing phases that land beside the API phase each one consumes, and leaves the
+> staff console out. It supersedes the single-pass reading of **S2** *for user-facing
+> screens only*: U0 (the `/app` namespace, i.e. **S3**) and U1 (`/app/profile`) are now
+> implemented ahead of R1.3. **S2** still governs the staff console.
+> **Owner split:** the UI stream is handed to a second owner working from `UI-ROADMAP.md`
+> §0 (what is built, what is left); this file continues the API stream, R1.3 next. The two
+> meet at the phases U5–U9, each of which is blocked on one API phase.
+
 **Ground rules → §7.** The three that bite hardest:
 
 1. Every new table goes into `VOLATILE_TABLES` (`apps/api/test/helpers.ts`) or rows
@@ -318,6 +327,18 @@ bulk and trash → autosave and version history → public renderer → preview 
 QR. The API changes during this pass only to fix a bug; feature pressure goes into
 Release 2, never into R1.8.
 
+**Status (2026-10-06).** The user-facing half of that pass has begun and is now sequenced
+by `UI-ROADMAP.md`, which lands each screen beside the API phase it consumes instead of
+waiting for the last one. Landed so far: **U0** (the `/app` namespace move — the **S3**
+router change described below) and **U1** (`/app/profile`: identity, social links,
+security, account record, against R1.1/R1.2). That leaves R1.8 as the staff console
+(spec §8–§9) plus whatever `UI-ROADMAP.md` has not yet sequenced; it is no longer one
+monolithic pass over the whole SPA.
+
+The UI stream is now **handed to a second owner**. `UI-ROADMAP.md` §0 is that stream's
+built-versus-to-build dashboard and its phase detail stays in §7; this file keeps the API
+plan and picks up with **R1.3**.
+
 The console namespace move (**S3**) is applied to the SPA router **before** the first new
 console screen, not after: `AppShell` and `Guards` need a nested `/app` layout first.
 
@@ -419,7 +440,7 @@ here — a decision keeps the name it was discussed under.
 | ID | Decision |
 | --- | --- |
 | **S1** | **Release boundary.** Release 1 = the owner product loop (former milestones M2–M7, merged). Release 2 = M8–M16. |
-| **S2** | **API first.** No UI is written until R1.1–R1.7 land; a single UI pass (R1.8) then consumes frozen contracts. |
+| **S2** | **API first.** No UI is written until R1.1–R1.7 land; a single UI pass (R1.8) then consumes frozen contracts. For **user-facing** screens this is superseded by `UI-ROADMAP.md`, which lands each screen beside its API phase (U0/U1 are in). Still standing for the staff console. |
 | **S3** | **Console namespace** (**D3**). The console lives under `/app/*`. That resolves §1.7 without shrinking the public namespace: only `app` needs adding to `content.reserved_slugs`, and the SPA router owns everything under it. |
 
 ### Open — close each before the phase it blocks

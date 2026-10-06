@@ -15,13 +15,22 @@ export type Role = 'owner' | 'admin' | 'moderator' | 'support' | 'user'
 
 export type UserStatus = 'active' | 'pending' | 'suspended' | 'banned' | 'deleted'
 
-/** A user as the API projects it. Shared by /auth/me and the admin endpoints. */
+/**
+ * A user as the API projects it. Shared by /auth/me and the admin endpoints.
+ *
+ * `displayName` is `string`, not `string | null`, because the server never sends
+ * null: `toApiUser` falls back to the username. A nullable type here would invite
+ * a `?? username` at every call site and hide that the fallback already happened.
+ */
 export interface PublicUser {
   id: string
   email: string
   username: string
-  displayName: string | null
+  displayName: string
   bio: string | null
+  /** R1.2. Plain text the owner writes; null when unset. */
+  location: string | null
+  pronouns: string | null
   avatarKey: string | null
   role: Role
   status: UserStatus
@@ -94,4 +103,94 @@ export interface PublicSettings {
   platformName: string
   settings: Record<string, string>
   roles: RoleDescriptor[]
+}
+
+// ------------------------------------------------------- profile identity ----
+
+/**
+ * The platforms a social link may claim — `SOCIAL_PLATFORMS` in
+ * `apps/api/src/lib/constants.ts`, verbatim.
+ *
+ * A closed union rather than `string`, because the API rejects anything else with
+ * a `422` and the platform *is* the icon the list renders. The runtime array in
+ * `features/profile/social-platforms.ts` is asserted against this union, so the
+ * two cannot drift without a compile error.
+ */
+export type SocialPlatform =
+  | 'website'
+  | 'x'
+  | 'twitter'
+  | 'bluesky'
+  | 'threads'
+  | 'mastodon'
+  | 'instagram'
+  | 'facebook'
+  | 'linkedin'
+  | 'github'
+  | 'gitlab'
+  | 'youtube'
+  | 'tiktok'
+  | 'twitch'
+  | 'vimeo'
+  | 'spotify'
+  | 'soundcloud'
+  | 'discord'
+  | 'telegram'
+  | 'whatsapp'
+  | 'reddit'
+  | 'pinterest'
+  | 'dribbble'
+  | 'behance'
+  | 'medium'
+  | 'substack'
+  | 'patreon'
+  | 'ko-fi'
+
+/** One row of `GET /profile/socials`. `position` is the stored slot, 0-based. */
+export interface SocialLink {
+  id: string
+  platform: SocialPlatform
+  url: string
+  position: number
+  isVisible: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+export interface SocialsResponse {
+  socials: SocialLink[]
+}
+
+/**
+ * The body of `PATCH /auth/me` (R1.1 + R1.2).
+ *
+ * Only the keys present are written — the service reads `undefined` as "not in
+ * the body" — and `null` is how the nullable text columns are cleared. A `""` is
+ * not the same thing on the wire: for `displayName` it is a `422`, so the editor
+ * sends `null` for the clearable ones and never an empty string.
+ */
+export interface UpdateProfileInput {
+  displayName?: string
+  bio?: string | null
+  location?: string | null
+  pronouns?: string | null
+  username?: string
+}
+
+/** `PATCH /auth/me` answers the identity half only — no session fields. */
+export interface UpdateProfileResponse {
+  user: PublicUser
+}
+
+export interface CreateSocialInput {
+  platform: SocialPlatform
+  url: string
+  isVisible?: boolean
+}
+
+/** A delta edit; a social has nothing clearable, only replaceable. */
+export interface UpdateSocialInput {
+  platform?: SocialPlatform
+  url?: string
+  isVisible?: boolean
 }
