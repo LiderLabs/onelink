@@ -75,6 +75,9 @@ export const DEFAULT_RESERVED_USERNAMES = [
 export const DEFAULT_RESERVED_SLUGS = [
   'admin',
   'api',
+  // Console namespace (S3): the SPA console lives under /app/*, so /app and
+  // everything beneath it is unreachable to a user-chosen slug forever.
+  'app',
   'settings',
   'login',
   'logout',
@@ -163,3 +166,91 @@ export const MAX_NOTE_LENGTH = 4_000
 export const MAX_REASON_LENGTH = 1_000
 export const MAX_URL_LENGTH = 2_048
 export const MAX_SLUG_LENGTH = 48
+
+// ---------------------------------------------------------------- identity caps --
+/**
+ * Write caps for a profile (D12).
+ *
+ * STRICT ON WRITE, LENIENT ON READ: these bound what an owner may SAVE. Rows
+ * written before the caps existed may exceed them — up to the pre-R1.1 limits of
+ * 80/500, which `user.service.ts` still uses on the staff-edit path — and are
+ * read back verbatim rather than truncated, because silently shortening somebody's
+ * bio on the way out is a data-loss bug disguised as validation.
+ */
+export const MAX_DISPLAY_NAME_LENGTH = 50
+export const MAX_BIO_LENGTH = 160
+
+/**
+ * `location` and `pronouns` (R1.2).
+ *
+ * The spec pins only `displayName` (50) and `bio` (160); these two are ours. Both
+ * are deliberately small because both render as a single line beside the display
+ * name — on a public page and in a link preview — so a longer value would be
+ * clipped by every consumer anyway. Same rule as above: strict on write, lenient
+ * on read, never truncated on the way out.
+ */
+export const MAX_LOCATION_LENGTH = 100
+export const MAX_PRONOUNS_LENGTH = 40
+
+/**
+ * Platforms a profile social link may claim (R1.2).
+ *
+ * Same shape of policy as `DEFAULT_RESERVED_SLUGS`: a compiled-in list applied in
+ * two places — the zod schema (`validation/profile.schema.ts`), which is what
+ * turns an unknown platform into a `422`, and the service
+ * (`services/profile.service.ts`), which re-checks it as the last line of
+ * defence for a caller that skips the schema. 0003 creates `user_social_links`
+ * as a STRICT table, so this enum *could* have been a CHECK — but 0003 also
+ * ALTERs `users`, and the rule settled by `0002`'s `layout` is that an enum
+ * arriving with a migration lives in code, never in SQL.
+ *
+ * Lower-cased, and compared after normalisation. Deliberately NOT seeded into
+ * `settings`, unlike the two reserved lists: a platform is a rendering contract
+ * (a name and an icon shipped in `apps/web`), not policy an owner tunes, so
+ * widening this list is a code change by design. Narrowing it is not supported
+ * either — a row holding a platform that later left this list still reads back
+ * whole, because reads stay lenient.
+ */
+export const SOCIAL_PLATFORMS = [
+  'website',
+  'x',
+  'twitter',
+  'bluesky',
+  'threads',
+  'mastodon',
+  'instagram',
+  'facebook',
+  'linkedin',
+  'github',
+  'gitlab',
+  'youtube',
+  'tiktok',
+  'twitch',
+  'vimeo',
+  'spotify',
+  'soundcloud',
+  'discord',
+  'telegram',
+  'whatsapp',
+  'reddit',
+  'pinterest',
+  'dribbble',
+  'behance',
+  'medium',
+  'substack',
+  'patreon',
+  'ko-fi',
+] as const
+
+export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number]
+
+/**
+ * How many social links one profile may hold (R1.2).
+ *
+ * The profile is a short list of places to find a person, and this API is its
+ * only writer, so the cap is what keeps an authenticated write surface from
+ * turning one account into an unbounded link farm. `MAX_LINKS_PER_PAGE_HARD_CAP`
+ * is the same idea one level up; this one has no settings row because nothing has
+ * asked to tune it yet.
+ */
+export const MAX_SOCIAL_LINKS_PER_USER = 20

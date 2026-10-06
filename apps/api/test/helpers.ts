@@ -172,6 +172,33 @@ export async function loginAsByEmail(
   return loginWith({ identifier: user.email, password: user.password })
 }
 
+/**
+ * A session cookie for `targetUsername`, stamped as minted by a staff session
+ * acting on that account (`sessions.impersonated_by`).
+ *
+ * There is deliberately no public "impersonate" endpoint in the API yet, so the
+ * row is built here the way that route will build it. Both HTTP suites have to
+ * prove that an impersonated session cannot write, so the fixture lives beside
+ * the other shared ones instead of being copied per file.
+ */
+export async function impersonatedCookieFor(
+  targetUsername: string,
+  targetPassword: string,
+): Promise<string> {
+  const target = await createTestUser({ username: targetUsername, password: targetPassword })
+  const admin = await createTestUser({ role: 'admin', username: `staff-${targetUsername}` })
+  const cookie = await loginAs(target)
+
+  await env.DB.prepare(
+    `UPDATE sessions SET impersonated_by = ? WHERE user_id = ? AND revoked_at IS NULL`,
+  )
+    .bind(admin.id, target.id)
+    .run()
+
+  return cookie
+}
+
+
 async function loginWith(credentials: { identifier: string; password: string }): Promise<string> {
   const response = await api('POST', '/api/v1/auth/login', {
     body: credentials,
@@ -268,6 +295,9 @@ const VOLATILE_TABLES = [
   'sessions',
   'password_reset_tokens',
   'invitations',
+  // `user_social_links.user_id` is ON DELETE RESTRICT like the others, so it has to
+  // go before `users` (R1.2).
+  'user_social_links',
   'users',
 ] as const
 

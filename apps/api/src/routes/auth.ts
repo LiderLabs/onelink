@@ -14,7 +14,12 @@ import { humanizeDuration } from '../lib/clock'
 import { forbidden } from '../lib/errors'
 import { capabilitiesOf } from '../lib/rbac'
 import { rateLimit } from '../middleware/rate-limit'
-import { requireActiveAccount, requireSession } from '../middleware/auth'
+import {
+  requireActiveAccount,
+  requirePasswordSettled,
+  requireSession,
+  requireUnimpersonated,
+} from '../middleware/auth'
 import {
   buildPasswordResetUrl,
   changePassword,
@@ -30,7 +35,7 @@ import {
   platformNameOf,
   SETTING_KEYS,
 } from '../services/settings.service'
-import { actorInfoOf, registerUser } from '../services/user.service'
+import { actorInfoOf, registerUser, updateOwnProfile } from '../services/user.service'
 import { currentUser, readJson } from './helpers'
 import {
   changePasswordSchema,
@@ -39,6 +44,7 @@ import {
   registerSchema,
   resetPasswordSchema,
 } from '../validation/auth.schema'
+import { updateProfileSchema } from '../validation/profile.schema'
 import type { AppEnv } from '../types'
 
 // ============================================================================
@@ -162,6 +168,51 @@ authRoutes.get('/me', requireSession, async (c) => {
     serverTime: Date.now(),
   })
 })
+
+/**
+ * Self-service profile edit (R1.1).
+ *
+ * `requireUnimpersonated` is what makes this safe to hand to every role: without
+ * it an admin acting as a user could rewrite that account's identity, while the
+ * `GET /me` one route above stays readable — which is the entire point of a
+ * support session. `requirePasswordSettled` is here too, because a profile write
+ * is exactly the sort of "settle in first" action that guard exists to postpone.
+ * Note it is `requireActiveAccount` rather than the GET's `requireSession`: a
+ * suspended account must not be able to edit itself out of trouble.
+ *
+ * The rate limit sits AFTER the guards and BEFORE the body, per §7.2: nothing is
+ * parsed before the flood is rejected, and the actor is already resolved, which
+ * is what gives a `user`-scoped rule an identity to count against.
+ *
+ * The response carries `user` with the same shape `GET /me` returns it, so the
+ * SPA can replace the session user instead of merging field by field.
+ * `capabilities` is not echoed because nothing reachable here can change a role.
+ */
+authRoutes.patch(
+  '/me',
+  requireActiveAccount,
+  requirePasswordSettled,
+  requireUnimpersonated,
+  rateLimit('profile_write_user'),
+  async (c) => {
+    const body = await readJson(c, updateProfileSchema)
+    const user = await updateOwnProfile(
+      c.env.DB,
+      actorInfoOf(currentUser(c)),
+      {
+        displayName: body.displayName,
+        bio: body.bio,
+        // R1.2: two more optional keys on the same body, written as two more columns
+        // on the same row. `undefined` stays "not in the body" all the way down.
+        location: body.location,
+        pronouns: body.pronouns,
+        username: body.username,
+      },
+      c.get('auditor'),
+    )
+    return ok(c, { user })
+  },
+)
 
 /**
  * `requireActiveAccount` rather than full auth: this is the ONE route a user

@@ -22,7 +22,8 @@ import {
   totalPagesFor,
 } from '../src/lib/query'
 import { humanizeDuration, isExpired, toIso } from '../src/lib/clock'
-import { parseSettingValue } from '../src/services/settings.service'
+import { DEFAULT_RESERVED_SLUGS } from '../src/lib/constants'
+import { SETTING_KEYS, parseSettingValue, reservedSlugsOf } from '../src/services/settings.service'
 import {
   assertCanEditUser,
   assertCanGrantRole,
@@ -274,6 +275,42 @@ describe('settings value parsing', () => {
     expect(parseSettingValue(row('string', 'hello'))).toBe('hello')
     expect(parseSettingValue(row('json', '["a","b"]'))).toEqual(['a', 'b'])
     expect(parseSettingValue(row('json', '{not json'))).toBeNull()
+  })
+})
+
+describe('reserved slug policy', () => {
+  it('reserves the console namespace the SPA owns (S3)', () => {
+    // /app/* is the admin console. A link page claiming `app` would shadow the
+    // console for anyone who follows that link, so the namespace is reserved
+    // rather than merely unreserved-by-omission.
+    expect(DEFAULT_RESERVED_SLUGS).toContain('app')
+  })
+
+  it('keeps the shipped list normalised and duplicate-free', () => {
+    // Slugs reach the comparison already normalised (lower-cased) and are
+    // matched with `includes`, so an upper-case entry, a stray space or a
+    // duplicate would be silently dead policy rather than a loud failure.
+    expect(DEFAULT_RESERVED_SLUGS).toEqual([...new Set(DEFAULT_RESERVED_SLUGS)])
+    for (const slug of DEFAULT_RESERVED_SLUGS) expect(slug).toBe(slug.toLowerCase())
+  })
+
+  it('falls back to the shipped list when the setting is missing or unusable', () => {
+    // The setting is owner-editable at runtime, so a missing row, a wrong type
+    // and an empty array must all degrade to the compiled-in list: an empty
+    // policy would let the next page squat `login` or `api`.
+    const withSetting = (value: unknown): string[] =>
+      reservedSlugsOf({ [SETTING_KEYS.reservedSlugs]: value })
+
+    expect(withSetting(undefined)).toContain('app')
+    expect(withSetting('not-an-array')).toContain('app')
+    expect(withSetting([])).toContain('app')
+  })
+
+  it('uses the stored list once it holds at least one usable entry', () => {
+    const map = { [SETTING_KEYS.reservedSlugs]: [' Login ', '', 42, 'SIGNUP'] }
+    // Trimmed and lower-cased, non-strings dropped. `app` is then NOT reserved,
+    // which is the owner's call to make by replacing the seeded list.
+    expect(reservedSlugsOf(map)).toEqual(['login', 'signup'])
   })
 })
 

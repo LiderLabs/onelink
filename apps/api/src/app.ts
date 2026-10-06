@@ -17,6 +17,7 @@ import { healthRoutes } from './routes/health'
 import { publicRoutes } from './routes/public'
 import { authRoutes } from './routes/auth'
 import { pageRoutes } from './routes/pages'
+import { profileRoutes } from './routes/profile'
 import { userRoutes } from './routes/users'
 import { settingsRoutes } from './routes/settings'
 import { auditRoutes } from './routes/audit'
@@ -108,6 +109,7 @@ export function createApp() {
   app.route('/api/v1/public', publicRoutes)
   app.route('/api/v1/auth', authRoutes)
   app.route('/api/v1/pages', pageRoutes)
+  app.route('/api/v1/profile', profileRoutes)
   app.route('/api/v1/admin/users', userRoutes)
   app.route('/api/v1/admin/settings', settingsRoutes)
   app.route('/api/v1/admin/audit-logs', auditRoutes)

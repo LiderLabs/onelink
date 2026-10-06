@@ -7,6 +7,7 @@ import type {
   SessionRow,
   UserNoteRow,
   UserRow,
+  UserSocialLinkRow,
 } from '../types'
 
 // ============================================================================
@@ -22,6 +23,12 @@ export function toApiUser(row: UserRow): ApiUser {
     username: row.username,
     displayName: row.display_name ?? row.username,
     bio: row.bio,
+    // `?? null` rather than a bare copy: `location`/`pronouns` arrive with 0003, so
+    // a query that enumerates its columns from before that migration would hand
+    // back `undefined` — and `JSON.stringify` deletes undefined keys, which would
+    // ship a DTO missing a field its own type promises.
+    location: row.location ?? null,
+    pronouns: row.pronouns ?? null,
     avatarKey: row.avatar_key,
     role: row.role,
     status: row.status,
@@ -195,6 +202,32 @@ export function toPageLinkDto(row: PageLinkRow): Record<string, unknown> {
     isVisible: row.is_visible === 1,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+// ----------------------------------------------------------------- socials --
+
+/**
+ * A profile social link as the API exposes it (R1.2).
+ *
+ * `userId` is deliberately absent — this resource is only ever read by its owner
+ * (the public render is R1.7, through `toPublicPage`), so an id that is always the
+ * caller's own tells them nothing and invites the `/pages/mine` mistake of leaking a
+ * column just because the row had it. `position` IS present, because the editor
+ * needs the slot even when the array is the only thing it renders from.
+ *
+ * There is no derived `label` or `icon`: the platform IS the icon, and
+ * `SOCIAL_PLATFORMS` in `lib/constants.ts` is the contract `apps/web` renders from.
+ */
+export function toSocialLinkDto(row: UserSocialLinkRow): Record<string, unknown> {
+  return {
+    id: row.id,
+    platform: row.platform,
+    url: row.url,
+    position: row.position,
+    isVisible: row.is_visible === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

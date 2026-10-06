@@ -5,12 +5,17 @@ import {
   api,
   countRows,
   createTestUser,
+  impersonatedCookieFor,
   loginAs,
   resetIsolateCaches,
   setSettingValue,
   type Envelope,
   type ErrorEnvelope,
 } from './helpers'
+// The one src import in this HTTP suite: `latestRevision` is the *ledger's* own
+// answer (`MAX(page_revisions.revision)`), so a test can assert that the
+// denormalised `pages.content_revision` the API now reads still agrees with it.
+import { latestRevision } from '../src/services/page.service'
 
 // ============================================================================
 // /api/v1/pages + GET /api/v1/public/pages/:slug — the owner's link pages.
@@ -19,9 +24,10 @@ import {
 // no mocks, so the UNIQUE indexes, CHECK constraints and FK enforcement are
 // the production ones.
 //
-// One impersonation test seeds a session row by hand: there is deliberately no
-// public "impersonate" endpoint in the API yet, so the row is built the way
-// the future route will build it (a session with `impersonated_by` set).
+// Impersonated sessions — the ones that prove a support session is read-only —
+// are built by `impersonatedCookieFor` in helpers.ts: there is deliberately no
+// public "impersonate" endpoint in the API yet, so the row is stamped there the
+// way that route will stamp it.
 // ============================================================================
 
 beforeEach(() => {
@@ -66,20 +72,16 @@ async function createPageAs(cookie: string, body: unknown = { slug: 'my-page' })
   return api<Envelope<ApiPage>>('POST', '/api/v1/pages', { cookie, body })
 }
 
-async function impersonatedCookieFor(targetUsername: string, targetPassword: string): Promise<string> {
-  const target = await createTestUser({ username: targetUsername, password: targetPassword })
-  const admin = await createTestUser({ role: 'admin', username: `staff-${targetUsername}` })
-  const cookie = await loginAs(target)
-
-  // A session stamped as "minted by staff acting as this user", exactly as an
-  // impersonation endpoint would write it.
-  await env.DB.prepare(
-    `UPDATE sessions SET impersonated_by = ? WHERE user_id = ? AND revoked_at IS NULL`,
-  )
-    .bind(admin.id, target.id)
-    .run()
-
-  return cookie
+/**
+ * `pages.content_revision` straight from D1. The column's `DEFAULT` is 1, so a
+ * missing row and a never-published page must not look alike: `-1` for the
+ * former, `0` for the latter.
+ */
+async function contentRevisionOf(pageId: string): Promise<number> {
+  const row = await env.DB.prepare('SELECT content_revision FROM pages WHERE id = ?')
+    .bind(pageId)
+    .first<{ content_revision: number }>()
+  return row?.content_revision ?? -1
 }
 
 describe('access control on /api/v1/pages', () => {
@@ -174,6 +176,16 @@ describe('POST /api/v1/pages', () => {
     expect(response.status).toBe(409)
   })
 
+  it('refuses the /app console namespace, seed included', async () => {
+    const user = await createTestUser({ role: 'user' })
+    // The list the API actually consults is the seeded `content.reserved_slugs`
+    // setting (`DEFAULT_RESERVED_SLUGS` is only the fallback when that row is
+    // missing), so this pins the second of the two places `app` must appear.
+    const response = await createPageAs(await loginAs(user), { slug: 'app' })
+    expect(response.status).toBe(409)
+    expect(errorOf(response).error.code).toBe('CONFLICT')
+  })
+
   it('refuses a taken slug (409, not a 500 from the UNIQUE index)', async () => {
     const first = await createTestUser({ role: 'user' })
     const second = await createTestUser({ role: 'user' })
@@ -234,6 +246,51 @@ describe('GET /api/v1/pages/mine and GET /:id', () => {
     })
     expect(response.status).toBe(200)
     expect(response.body.data).toHaveLength(2)
+  })
+
+  it('returns owner DTOs — camelCase fields only, plus the list meta (R1.1)', async () => {
+    const owner = await createTestUser({ role: 'user' })
+    const cookie = await loginAs(owner)
+
+    await createPageAs(cookie, { slug: 'dto-one' })
+    await createPageAs(cookie, { slug: 'dto-two' })
+
+    const response = await api<Envelope<Record<string, unknown>[]>>(
+      'GET',
+      '/api/v1/pages/mine?page=1&limit=1',
+      { cookie },
+    )
+
+    expect(response.status).toBe(200)
+    // `meta` is what the SPA paginates on: two pages at one per request is the
+    // smallest request that proves `total` counts rows the page did not return.
+    expect(response.body.meta).toMatchObject({ page: 1, limit: 1, total: 2, totalPages: 2 })
+
+    expect(response.body.data).toHaveLength(1)
+    const page = response.body.data[0] ?? {}
+
+    // The exact key set, not a subset: a column the mapper does not name must
+    // not survive the round trip, which is how raw `user_id`, `deleted_at` and
+    // `content_revision` used to leak straight out of the table.
+    expect(Object.keys(page).sort()).toEqual([
+      'accentColor',
+      'bio',
+      'createdAt',
+      'deletedAt',
+      'id',
+      'layout',
+      'moderationStatus',
+      'publishedAt',
+      'revision',
+      'showBranding',
+      'slug',
+      'status',
+      'theme',
+      'title',
+      'updatedAt',
+      'visibility',
+    ])
+    expect(Object.keys(page).filter((key) => key.includes('_'))).toEqual([])
   })
 
   it('answers 404 — not 403 — for another user’s page', async () => {
@@ -366,6 +423,28 @@ describe('publish lifecycle', () => {
     ).resolves.toBe(2)
   })
 
+  it('mirrors the live revision into pages.content_revision', async () => {
+    const user = await createTestUser({ role: 'user' })
+    const cookie = await loginAs(user)
+    const created = await createPageAs(cookie, { slug: 'mirrored' })
+    const pageId = (created.body.data as ApiPage).id
+
+    // A draft has published nothing. The column's own DEFAULT is 1, so unless
+    // create stamps a sentinel, `revision` could not tell "never published"
+    // from "published once" (R1.0).
+    expect(created.body.data.revision).toBeNull()
+    expect(await contentRevisionOf(pageId)).toBe(0)
+
+    await api('POST', `/api/v1/pages/${pageId}/publish`, { cookie })
+
+    // `revision` is now read from this column rather than aggregated out of
+    // `page_revisions`, so the copy has to stay honest: assert it against the
+    // ledger's own answer. The second publish in the test above proves the
+    // column keeps moving (the wire saw 1, then 2).
+    expect(await contentRevisionOf(pageId)).toBe(1)
+    expect(await contentRevisionOf(pageId)).toBe(await latestRevision(env.DB, pageId))
+  })
+
   it('unpublishes without deleting history', async () => {
     const user = await createTestUser({ role: 'user' })
     const cookie = await loginAs(user)
@@ -379,6 +458,12 @@ describe('publish lifecycle', () => {
     expect(unpublished.status).toBe(200)
     expect(unpublished.body.data.status).toBe('draft')
     expect(unpublished.body.data.publishedAt).toBeNull()
+
+    // Taking a page down does not erase what was published: `revision` still
+    // names the last published snapshot, and `pages.content_revision` is left
+    // alone so a republication continues from the live number (R1.0).
+    expect(unpublished.body.data.revision).toBe(1)
+    expect(await contentRevisionOf(pageId)).toBe(1)
 
     await expect(
       countRows('SELECT count(*) AS total FROM page_revisions WHERE page_id = ?', pageId),

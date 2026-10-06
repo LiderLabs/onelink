@@ -27,7 +27,14 @@ INSERT OR IGNORE INTO settings (key, value, type, label, grp, description, is_pu
   ('moderation.report_cooldown_minutes', '0',     'number',  'Per-reporter cooldown',  'moderation', 'Minutes a reporter must wait between reports.', 0, 1735689600000),
 
   ('content.max_links_per_page', '50', 'number', 'Max links per page', 'content', 'Upper bound on page_links rows.', 1, 1735689600000),
-  ('content.reserved_slugs',     '["admin","api","settings","login","logout","signup","register","dashboard","about","terms","privacy","support","help","static","assets","health","favicon.ico","robots.txt","sitemap.xml"]', 'json', 'Reserved slugs', 'content', 'Slugs nobody may claim.', 1, 1735689600000),
+  -- S3 (R1.0): the console lives under /app/*, so `app` is reserved alongside
+  -- the SPA's own paths. `INSERT OR IGNORE` means a database that already has
+  -- this row keeps the list it has, so an operator upgrading an existing
+  -- deployment runs this once:
+  --   UPDATE settings
+  --      SET value = json_insert(value, '$[#]', 'app')
+  --    WHERE key = 'content.reserved_slugs';
+  ('content.reserved_slugs',     '["admin","api","app","settings","login","logout","signup","register","dashboard","about","terms","privacy","support","help","static","assets","health","favicon.ico","robots.txt","sitemap.xml"]', 'json', 'Reserved slugs', 'content', 'Slugs nobody may claim. Mirrors DEFAULT_RESERVED_SLUGS in src/lib/constants.ts.', 1, 1735689600000),
   ('content.reserved_usernames', '["owner","admin","administrator","root","system","sysadmin","staff","support","help","moderator","security","abuse","billing","postmaster","webmaster","noreply","no-reply","mail","email","api","onelink","official","me","settings","login","logout","register","signup","dashboard","account","anonymous","guest","null","undefined"]', 'json', 'Reserved usernames', 'content', 'Usernames public sign-up may not claim. Mirrors DEFAULT_RESERVED_USERNAMES in src/lib/constants.ts.', 0, 1735689600000),
 
   ('appeals.max_attempts', '2',  'number', 'Max appeal attempts',  'appeals', 'Per sanction, before the door closes.', 0, 1735689600000),
@@ -94,6 +101,11 @@ INSERT OR IGNORE INTO rate_limits (key, scope, max_requests, window_seconds, act
   ('register_ip',        'ip',     5,    3600, 'block',    1, 1735689600000),
   ('password_reset_ip',  'ip',     5,    3600, 'block',    1, 1735689600000),
   ('pages_write_user',   'user',   120,  3600, 'block',    1, 1735689600000),
+  -- R1.1: `PATCH /auth/me`. Deliberately NOT folded into `pages_write_user` —
+  -- renaming yourself is not editing a page, and one budget for both would let a
+  -- profile form spend the allowance an editor needs. `block`, because a profile
+  -- write is a deliberate human action with nothing to degrade to.
+  ('profile_write_user', 'user',   60,   3600, 'block',    1, 1735689600000),
   ('report_create_ip',   'ip',     10,   3600, 'block',    1, 1735689600000),
   ('media_upload_user',  'user',   60,   3600, 'throttle', 1, 1735689600000),
   ('api_global',         'global', 6000, 60,   'throttle', 1, 1735689600000);

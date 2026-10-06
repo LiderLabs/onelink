@@ -1,11 +1,12 @@
-import { Hono } from 'hono'
-import { createMiddleware } from 'hono/factory'
-import { forbidden, unauthenticated } from '../lib/errors'
+﻿import { Hono } from 'hono'
 import { list, noContent, ok } from '../lib/http'
 import { parsePagination } from '../lib/query'
 import { readInt } from '../lib/params'
-import { requireActiveAccount, requirePasswordSettled } from '../middleware/auth'
-import { isMutationMethod } from '../middleware/audit'
+import {
+  requireActiveAccount,
+  requirePasswordSettled,
+  requireUnimpersonated,
+} from '../middleware/auth'
 import { rateLimit } from '../middleware/rate-limit'
 import { actorInfoOf } from '../services/user.service'
 import {
@@ -14,15 +15,18 @@ import {
   deletePage,
   deletePageLink,
   getOwnedPageDetail,
-  listOwnPages,
   publishPage,
   reorderPageLinks,
-  requireOwnedPage,
-  requireOwnedPageLink,
+  toOwnerPageDto,
   unpublishPage,
   updatePage,
   updatePageLink,
 } from '../services/page.service'
+import {
+  listAccessiblePages,
+  requirePageAccess,
+  requirePageLinkAccess,
+} from '../services/page-access.service'
 import { currentUser, readJson } from './helpers'
 import {
   createPageLinkSchema,
@@ -42,35 +46,25 @@ import type { AppEnv } from '../types'
 //
 //   1. `requireActiveAccount` — no suspended/banned/deleted/pending accounts,
 //   2. `requirePasswordSettled` — no outstanding forced password change,
-//   3. `requireOwnerSelf` — impersonated (read-only) sessions cannot mutate.
+//   3. `requireUnimpersonated` — impersonated (read-only) sessions cannot mutate.
 //
-// That third guard exists because owner routes do NOT use `requireCapability`,
-// which is where the impersonation check normally lives. Copying its rule here
-// keeps the guarantee ("an admin acting as a user cannot write as them") true
-// on every mutation surface, including this one.
+// The third guard lives in `middleware/auth.ts` and is composed explicitly,
+// because owner routes do NOT use `requireCapability` — which is where the
+// impersonation rule normally lives. It moved there in R1.1, when `PATCH
+// /auth/me` needed the same rule: one implementation, so the guarantee ("an
+// admin acting as a user cannot write as them") cannot hold on one surface and
+// quietly not on another.
 //
-// Reads additionally hide foreign pages as 404 (`requireOwnedPage`), so these
-// routes never confirm whether a page id belongs to someone else.
+// Reads AND writes reach their page through one access seam (R1.0):
+// `requirePageAccess` answers "may this actor reach this page?" and hides every
+// other answer as `404 Page`, so these routes never confirm whether a page id
+// belongs to someone else. R2.1's page teams change that one function, not
+// these handlers.
 // ============================================================================
 
 export const pageRoutes = new Hono<AppEnv>()
 
 const writeLimit = rateLimit('pages_write_user')
-
-/**
- * Impersonated sessions are READ-ONLY. This is the same rule `requireCapability`
- * enforces (see middleware/auth.ts), restated here because these routes do not
- * carry a capability: an admin acting as a user must not publish, delete, or
- * reorder as them, or the audit trail becomes a lie.
- */
-const requireOwnerSelf = createMiddleware<AppEnv>(async (c, next) => {
-  const user = c.get('user')
-  if (!user) throw unauthenticated()
-  if (user.impersonatedBy !== null && isMutationMethod(c.req.method)) {
-    throw forbidden('Impersonation sessions are read-only.')
-  }
-  await next()
-})
 
 // --------------------------------------------------------------------- read --
 
@@ -81,8 +75,11 @@ pageRoutes.get(
   async (c) => {
     const user = currentUser(c)
     const pagination = parsePagination({ page: readInt(c, 'page'), limit: readInt(c, 'limit') })
-    const { rows, total } = await listOwnPages(c.env.DB, user.id, pagination)
-    return list(c, rows, total, pagination)
+    const { rows, total } = await listAccessiblePages(c.env.DB, actorInfoOf(user), pagination)
+    // DTOs, not rows (R1.1): a listing must not leak `user_id`, `deleted_at` or
+    // the internal `content_revision` counter, and it has to report a revision
+    // exactly the way `GET /:id` does — hence `page.service.ts` owns the mapping.
+    return list(c, rows.map(toOwnerPageDto), total, pagination)
   },
 )
 
@@ -92,7 +89,7 @@ pageRoutes.get(
   requirePasswordSettled,
   async (c) => {
     const user = currentUser(c)
-    const page = await requireOwnedPage(c.env.DB, user.id, c.req.param('id'))
+    const { page } = await requirePageAccess(c.env.DB, actorInfoOf(user), c.req.param('id'))
     return ok(c, await getOwnedPageDetail(c.env.DB, page))
   },
 )
@@ -104,7 +101,7 @@ pageRoutes.post(
   writeLimit,
   requireActiveAccount,
   requirePasswordSettled,
-  requireOwnerSelf,
+  requireUnimpersonated,
   async (c) => {
     const user = currentUser(c)
     const body = await readJson(c, createPageSchema)
@@ -132,10 +129,10 @@ pageRoutes.patch(
   writeLimit,
   requireActiveAccount,
   requirePasswordSettled,
-  requireOwnerSelf,
+  requireUnimpersonated,
   async (c) => {
     const user = currentUser(c)
-    const page = await requireOwnedPage(c.env.DB, user.id, c.req.param('id'))
+    const { page } = await requirePageAccess(c.env.DB, actorInfoOf(user), c.req.param('id'))
     const body = await readJson(c, updatePageSchema)
     return ok(c, await updatePage(
       c.env.DB,
@@ -162,10 +159,10 @@ pageRoutes.post(
   writeLimit,
   requireActiveAccount,
   requirePasswordSettled,
-  requireOwnerSelf,
+  requireUnimpersonated,
   async (c) => {
     const user = currentUser(c)
-    const page = await requireOwnedPage(c.env.DB, user.id, c.req.param('id'))
+    const { page } = await requirePageAccess(c.env.DB, actorInfoOf(user), c.req.param('id'))
     return ok(c, await publishPage(c.env.DB, actorInfoOf(user), page, c.get('auditor')))
   },
 )
@@ -175,10 +172,10 @@ pageRoutes.post(
   writeLimit,
   requireActiveAccount,
   requirePasswordSettled,
-  requireOwnerSelf,
+  requireUnimpersonated,
   async (c) => {
     const user = currentUser(c)
-    const page = await requireOwnedPage(c.env.DB, user.id, c.req.param('id'))
+    const { page } = await requirePageAccess(c.env.DB, actorInfoOf(user), c.req.param('id'))
     return ok(c, await unpublishPage(c.env.DB, actorInfoOf(user), page, c.get('auditor')))
   },
 )
@@ -188,10 +185,10 @@ pageRoutes.delete(
   writeLimit,
   requireActiveAccount,
   requirePasswordSettled,
-  requireOwnerSelf,
+  requireUnimpersonated,
   async (c) => {
     const user = currentUser(c)
-    const page = await requireOwnedPage(c.env.DB, user.id, c.req.param('id'))
+    const { page } = await requirePageAccess(c.env.DB, actorInfoOf(user), c.req.param('id'))
     await deletePage(c.env.DB, actorInfoOf(user), page, c.get('auditor'))
     return noContent(c)
   },
@@ -204,10 +201,10 @@ pageRoutes.post(
   writeLimit,
   requireActiveAccount,
   requirePasswordSettled,
-  requireOwnerSelf,
+  requireUnimpersonated,
   async (c) => {
     const user = currentUser(c)
-    const page = await requireOwnedPage(c.env.DB, user.id, c.req.param('id'))
+    const { page } = await requirePageAccess(c.env.DB, actorInfoOf(user), c.req.param('id'))
     const body = await readJson(c, createPageLinkSchema)
     const created = await createPageLink(
       c.env.DB,
@@ -234,11 +231,11 @@ pageRoutes.patch(
   writeLimit,
   requireActiveAccount,
   requirePasswordSettled,
-  requireOwnerSelf,
+  requireUnimpersonated,
   async (c) => {
     const user = currentUser(c)
-    const page = await requireOwnedPage(c.env.DB, user.id, c.req.param('id'))
-    const link = await requireOwnedPageLink(c.env.DB, page, c.req.param('linkId'))
+    const { page } = await requirePageAccess(c.env.DB, actorInfoOf(user), c.req.param('id'))
+    const link = await requirePageLinkAccess(c.env.DB, page, c.req.param('linkId'))
     const body = await readJson(c, updatePageLinkSchema)
     return ok(c, await updatePageLink(
       c.env.DB,
@@ -267,10 +264,10 @@ pageRoutes.put(
   writeLimit,
   requireActiveAccount,
   requirePasswordSettled,
-  requireOwnerSelf,
+  requireUnimpersonated,
   async (c) => {
     const user = currentUser(c)
-    const page = await requireOwnedPage(c.env.DB, user.id, c.req.param('id'))
+    const { page } = await requirePageAccess(c.env.DB, actorInfoOf(user), c.req.param('id'))
     const body = await readJson(c, reorderPageLinksSchema)
     return ok(c, {
       links: await reorderPageLinks(c.env.DB, actorInfoOf(user), page, body.linkIds, c.get('auditor')),
@@ -283,11 +280,11 @@ pageRoutes.delete(
   writeLimit,
   requireActiveAccount,
   requirePasswordSettled,
-  requireOwnerSelf,
+  requireUnimpersonated,
   async (c) => {
     const user = currentUser(c)
-    const page = await requireOwnedPage(c.env.DB, user.id, c.req.param('id'))
-    const link = await requireOwnedPageLink(c.env.DB, page, c.req.param('linkId'))
+    const { page } = await requirePageAccess(c.env.DB, actorInfoOf(user), c.req.param('id'))
+    const link = await requirePageLinkAccess(c.env.DB, page, c.req.param('linkId'))
     await deletePageLink(c.env.DB, actorInfoOf(user), page, link, c.get('auditor'))
     return noContent(c)
   },

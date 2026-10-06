@@ -1,5 +1,5 @@
 import { now } from '../lib/clock'
-import { MAX_NOTE_LENGTH, MAX_REASON_LENGTH, type Role, type UserStatus } from '../lib/constants'
+import { MAX_BIO_LENGTH, MAX_DISPLAY_NAME_LENGTH, MAX_LOCATION_LENGTH, MAX_NOTE_LENGTH, MAX_PRONOUNS_LENGTH, MAX_REASON_LENGTH, type Role, type UserStatus } from '../lib/constants'
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors'
 import { normalizeEmail, normalizeUsername, sanitizeMultiline, sanitizeSingleLine } from '../lib/http'
 import { hashPassword } from '../lib/crypto'
@@ -514,6 +514,124 @@ export async function updateUser(
 
   const entry = auditor.claim({
     action: 'user.update',
+    targetType: 'user',
+    targetId: target.id,
+    targetLabel: target.email,
+    actorUserId: actor.id,
+    actorRole: actor.role,
+    actorLabel: actor.label,
+    before,
+    after,
+  })
+
+  await db.batch([
+    db
+      .prepare(`UPDATE users SET ${patch.join(', ')}, updated_at = ? WHERE id = ?`)
+      .bind(...binds, timestamp, target.id),
+    auditInsertStmt(db, entry),
+  ])
+
+  return toApiUser(await requireUserById(db, target.id))
+}
+
+export interface UpdateProfileInput {
+  displayName?: string | undefined
+  bio?: string | null | undefined
+  location?: string | null | undefined
+  pronouns?: string | null | undefined
+  username?: string | undefined
+}
+
+/**
+ * Self-service profile edit (R1.1) — the write path behind `PATCH /auth/me`.
+ *
+ * Deliberately NOT `updateUser`. That function is the STAFF edit path: it opens
+ * with `assertCanEditUser` ("not more senior than me"), which is meaningless for
+ * an actor editing themselves, and it accepts `role` and `email` — a role grant
+ * needs a capability, and an address change has to reset `email_verified`.
+ * Neither is a thing a signed-in user may do to themselves, so sharing one
+ * function would leave every reader working out which half applies to them.
+ *
+ * What it DOES share is the parts that are policy rather than authorisation: the
+ * same `setField` delta recording, the same `assertEmailAndUsernameFree`
+ * uniqueness check, and the same single `db.batch()` write-then-audit, so the log
+ * row commits with the change it describes.
+ *
+ * Caps are **D12** (50 / 160) and apply on save only. `updateUser` keeps the
+ * pre-R1.1 80 / 500 so that a row which predates the caps stays editable.
+ *
+ * R1.2 extended this function rather than a second one: `location` and `pronouns`
+ * are two more nullable columns on the same row, behind the same route, so they are
+ * two more `setField` calls below — not a new service that would have to repeat the
+ * same audit shape, the same `before`/`after` recording and the same guards.
+ */
+export async function updateOwnProfile(
+  db: D1Database,
+  actor: ActorInfo,
+  input: UpdateProfileInput,
+  auditor: Auditor,
+): Promise<ApiUser> {
+  const target = await requireUserById(db, actor.id)
+
+  const patch: string[] = []
+  const binds: unknown[] = []
+  const before: Record<string, unknown> = {}
+  const after: Record<string, unknown> = {}
+
+  const setField = (column: string, value: unknown, key: string): void => {
+    patch.push(`${column} = ?`)
+    binds.push(value)
+    before[key] = (target as unknown as Record<string, unknown>)[column] ?? null
+    after[key] = value ?? null
+  }
+
+  if (input.displayName !== undefined) {
+    // Zod already bounded the length; this is the control-character pass, and it
+    // can still empty the string, which would leave the account with no name.
+    const displayName = sanitizeSingleLine(input.displayName, MAX_DISPLAY_NAME_LENGTH)
+    if (displayName.length === 0) throw badRequest('A display name is required.')
+    setField('display_name', displayName, 'displayName')
+  }
+  if (input.bio !== undefined) {
+    // `""` and `null` both mean "clear it" — the column is nullable and that is
+    // what an emptied textarea sends.
+    const bio = input.bio === null ? null : sanitizeMultiline(input.bio, MAX_BIO_LENGTH) || null
+    setField('bio', bio, 'bio')
+  }
+  if (input.location !== undefined) {
+    // R1.2 put these two on this same path rather than in a service of their own:
+    // they are columns on `users` like `bio`, so a second write path would be a
+    // second place for the same row's rules to drift. Same `null`/`""` reading, and
+    // `sanitizeSingleLine` can empty the string, which stores `null` rather than `""`
+    // — "somewhere" and "unset" must not be two different values in one column.
+    const location =
+      input.location === null ? null : sanitizeSingleLine(input.location, MAX_LOCATION_LENGTH) || null
+    setField('location', location, 'location')
+  }
+  if (input.pronouns !== undefined) {
+    const pronouns =
+      input.pronouns === null ? null : sanitizeSingleLine(input.pronouns, MAX_PRONOUNS_LENGTH) || null
+    setField('pronouns', pronouns, 'pronouns')
+  }
+  if (input.username !== undefined) {
+    const username = normalizeUsername(input.username)
+    if (username.length < 3) throw badRequest('Usernames must be at least 3 characters.')
+    if (username !== target.username) {
+      // Only a real change is worth a settings read, and only a real change can
+      // collide with another account.
+      await assertUsernameNotReserved(db, username)
+      setField('username', username, 'username')
+    }
+  }
+
+  if (patch.length === 0) return toApiUser(target)
+
+  const timestamp = now()
+  const nextUsername = typeof after.username === 'string' ? after.username : target.username
+  await assertEmailAndUsernameFree(db, target.email, nextUsername, target.id)
+
+  const entry = auditor.claim({
+    action: 'user.profile_update',
     targetType: 'user',
     targetId: target.id,
     targetLabel: target.email,

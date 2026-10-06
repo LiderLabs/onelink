@@ -17,6 +17,9 @@ export interface UserRow {
   username: string
   display_name: string | null
   bio: string | null
+  /** R1.2: single-line identity fields, both nullable and both optional on write. */
+  location: string | null
+  pronouns: string | null
   avatar_key: string | null
   password_hash: string | null
   password_changed_at: number | null
@@ -115,6 +118,26 @@ export interface UserNoteRow {
   author_label: string | null
   body: string
   created_at: number
+}
+
+/**
+ * `user_social_links` as stored (0003). Column names are the migration's, as
+ * everywhere else: the service reads and writes them directly, so a rename here
+ * would silently diverge from the SQL.
+ *
+ * No `deleted_at` — a social row is hard-deleted (see the 0003 header), which is
+ * why there is nothing to filter on the read path.
+ */
+export interface UserSocialLinkRow {
+  id: string
+  user_id: string
+  /** One of `SOCIAL_PLATFORMS`. Read leniently: a value that left the list still reads back. */
+  platform: string
+  url: string
+  position: number
+  is_visible: number
+  created_at: number
+  updated_at: number
 }
 
 export type PageStatus = 'draft' | 'published' | 'archived'
@@ -222,6 +245,9 @@ export interface ApiUser {
   username: string
   displayName: string
   bio: string | null
+  /** R1.2. Both are plain text the owner writes; both are absent/`null` when unset. */
+  location: string | null
+  pronouns: string | null
   avatarKey: string | null
   role: Role
   status: UserStatus

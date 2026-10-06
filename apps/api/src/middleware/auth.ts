@@ -14,6 +14,7 @@ import type { AppEnv, AuthUser } from '../types'
 //   requireSession        -> any authenticated identity, however damaged
 //   requireActiveAccount  -> status must be usable
 //   requirePasswordSettled-> no forced password change outstanding
+//   requireUnimpersonated -> an impersonation session may not mutate
 //   requireCapability(c)  -> all of the above + the role grant
 //
 // NOTE ON SHAPE: middleware that takes no arguments is exported as a READY
@@ -65,6 +66,29 @@ export const requirePasswordSettled = createMiddleware<AppEnv>(async (c, next) =
   const user = c.get('user')
   if (!user) throw unauthenticated()
   if (user.requirePasswordChange) throw passwordChangeRequired()
+  await next()
+})
+
+/**
+ * Impersonated sessions are READ-ONLY (R1.1).
+ *
+ * Lifted out of `routes/pages.ts`, where it was called `requireOwnerSelf`: owner
+ * routes do NOT go through `requireCapability`, which is where this rule
+ * otherwise lives, so without it an admin acting as a user could publish, delete
+ * or — now that the surface exists — rewrite that user's profile, and the audit
+ * trail would name the wrong actor. Two surfaces need the rule, so it lives here
+ * and both of them get the same implementation.
+ *
+ * Reads are deliberately NOT blocked: a support session must still be able to
+ * see the account it is acting as, and `middleware/audit.ts` records who really
+ * made a change (the session's `impersonated_by` is on every audit row).
+ */
+export const requireUnimpersonated = createMiddleware<AppEnv>(async (c, next) => {
+  const user = c.get('user')
+  if (!user) throw unauthenticated()
+  if (user.impersonatedBy !== null && isMutationMethod(c.req.method)) {
+    throw forbidden('Impersonation sessions are read-only.')
+  }
   await next()
 })
 

@@ -23,7 +23,6 @@ import type {
   Auditor,
   PageLinkRow,
   PageRow,
-  Pagination,
 } from '../types'
 
 // ============================================================================
@@ -34,6 +33,10 @@ import type {
 // all answer `404 Page`, never 403, so a caller cannot probe "does this id
 // belong to someone" by watching the status code change.
 //
+// Every "may this actor reach this page?" question is answered in
+// `page-access.service.ts` (R1.0): this file receives a row it is already
+// allowed to act on and never decides access itself.
+//
 // Slugs are claimed at creation and IMMUTABLE in this slice. A slug whose page
 // is deleted stays reserved (`slug_reservations`) so nobody can inherit the
 // removed page's inbound links and reputation.
@@ -42,49 +45,22 @@ import type {
 // INSERT in the same `db.batch()` as the change — the user.service.ts contract.
 // ============================================================================
 
-export interface PageListResult {
-  rows: PageRow[]
-  total: number
-}
-
-export async function listOwnPages(
-  db: D1Database,
-  userId: string,
-  pagination: Pagination,
-): Promise<PageListResult> {
-  const [rowsResult, countResult] = await db.batch([
-    db
-      .prepare(
-        'SELECT * FROM pages WHERE user_id = ? AND deleted_at IS NULL ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?',
-      )
-      .bind(userId, pagination.limit, pagination.offset),
-    db
-      .prepare('SELECT count(*) AS total FROM pages WHERE user_id = ? AND deleted_at IS NULL')
-      .bind(userId),
-  ])
-
-  return {
-    rows: (rowsResult?.results ?? []) as unknown as PageRow[],
-    total: asCount((countResult?.results?.[0] ?? null) as { total?: unknown } | null),
-  }
-}
+/**
+ * Listing and single-page access moved to `page-access.service.ts` (R1.0) —
+ * `listAccessiblePages`, `requirePageAccess`, `requirePageLinkAccess` — so the
+ * predicate that decides "reachable" has exactly one home.
+ */
 
 /**
- * An owned, live page — or `404 Page` when the id names nothing the caller may
- * see. This is the ONLY read path the owner routes use: it cannot leak.
+ * The value of `pages.content_revision` before a page's first publish.
+ *
+ * The column is `INTEGER NOT NULL DEFAULT 1` in 0001 and nothing ever wrote it,
+ * so it sat at 1 forever and could not be trusted (R1.0). Publishing now copies
+ * the revision it writes into `page_revisions` into this column, and a page
+ * that has never been published is stamped 0 — the only value that can mean "no
+ * revision yet" without inventing a plausible-looking `1` for a draft.
  */
-export async function requireOwnedPage(
-  db: D1Database,
-  userId: string,
-  pageId: string,
-): Promise<PageRow> {
-  const row = await db
-    .prepare('SELECT * FROM pages WHERE id = ? AND user_id = ? AND deleted_at IS NULL LIMIT 1')
-    .bind(pageId, userId)
-    .first<PageRow>()
-  if (!row) throw notFound('Page')
-  return row
-}
+const NEVER_PUBLISHED = 0
 
 /**
  * Policy on a not-yet-stored slug, checked after normalisation. Reserved and
@@ -92,7 +68,10 @@ export async function requireOwnedPage(
  * not need to distinguish "the platform said no" from "a peer got there
  * first".
  */
-async function assertSlugAvailable(db: D1Database, slug: string): Promise<void> {
+// Exported (R1.0) because R1.4's slug rename applies exactly this policy to a
+// page's CURRENT slug rather than a proposed one; a second copy of these rules
+// would drift the moment one of them changed.
+export async function assertSlugAvailable(db: D1Database, slug: string): Promise<void> {
   if (slug.length === 0) throw badRequest('A slug is required.')
   if (slug.length > MAX_SLUG_LENGTH) {
     throw badRequest(`Slugs must be at most ${MAX_SLUG_LENGTH} characters.`)
@@ -168,8 +147,8 @@ export async function createPage(
       .prepare(
         `INSERT INTO pages (
            id, user_id, slug, title, bio, theme, layout, accent_color,
-           show_branding, created_at, updated_at
-         ) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+           show_branding, content_revision, created_at, updated_at
+         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       )
       .bind(
         pageId,
@@ -181,6 +160,9 @@ export async function createPage(
         input.layout ?? 'list',
         input.accentColor ?? null,
         input.showBranding === false ? 0 : 1,
+        // A brand-new page has published nothing, so the row says so rather
+        // than inheriting the column's `DEFAULT 1` (R1.0).
+        NEVER_PUBLISHED,
         timestamp,
         timestamp,
       ),
@@ -189,7 +171,7 @@ export async function createPage(
 
   const row = await db.prepare('SELECT * FROM pages WHERE id = ?').bind(pageId).first<PageRow>()
   if (!row) throw notFound('Page')
-  return toApiPage(row, null)
+  return toApiPage(row, revisionOfPage(row))
 }
 
 export interface UpdatePageInput {
@@ -235,7 +217,7 @@ export async function updatePage(
     setField('show_branding', input.showBranding ? 1 : 0, 'showBranding')
   }
 
-  if (patch.length === 0) return toApiPage(target, await latestRevision(db, target.id))
+  if (patch.length === 0) return toApiPage(target, revisionOfPage(target))
 
   const timestamp = now()
   const entry = auditor.claim({
@@ -259,10 +241,43 @@ export async function updatePage(
 
   const row = await db.prepare('SELECT * FROM pages WHERE id = ?').bind(target.id).first<PageRow>()
   if (!row) throw notFound('Page')
-  return toApiPage(row, await latestRevision(db, target.id))
+  return toApiPage(row, revisionOfPage(row))
 }
 
-async function latestRevision(db: D1Database, pageId: string): Promise<number | null> {
+/**
+ * The revision `row` is currently showing, read from the page row itself.
+ *
+ * `0` means the page has never been published, which the API reports as
+ * `revision: null`. Unpublishing deliberately leaves the value alone: the page
+ * still has a last-published revision, it is simply not live.
+ */
+function revisionOfPage(row: PageRow): number | null {
+  return row.content_revision > NEVER_PUBLISHED ? row.content_revision : null
+}
+
+/**
+ * A page row as the OWNER sees it (R1.1).
+ *
+ * `GET /pages/mine` (the listing) and `GET /pages/:id` (the single read) both go
+ * through here, so the two can never disagree about a field name or about how a
+ * revision is reported — which is exactly what happened while `/mine` returned
+ * raw `PageRow` rows and leaked `user_id`, `deleted_at` and `content_revision`.
+ *
+ * `Record<string, unknown>` rather than an interface because the DTO shape *is*
+ * `toApiPage`, and a second hand-maintained interface for it is a thing that
+ * drifts without failing.
+ */
+export function toOwnerPageDto(row: PageRow): Record<string, unknown> {
+  return toApiPage(row, revisionOfPage(row))
+}
+
+/**
+ * Cross-check only, and exported for exactly that reason (R1.0): the API now
+ * reads `pages.content_revision`, while `page_revisions` is the ledger that
+ * value is copied from. A test asserts the two agree after a publish, which is
+ * what keeps the denormalised column honest instead of dead.
+ */
+export async function latestRevision(db: D1Database, pageId: string): Promise<number | null> {
   const row = await db
     .prepare('SELECT revision FROM page_revisions WHERE page_id = ? ORDER BY revision DESC LIMIT 1')
     .bind(pageId)
@@ -284,7 +299,7 @@ export async function getOwnedPageDetail(db: D1Database, target: PageRow): Promi
     .all<PageLinkRow>()
 
   return {
-    page: toApiPage(target, await latestRevision(db, target.id)),
+    page: toOwnerPageDto(target),
     links: results.map(toPageLinkDto),
   }
 }
@@ -334,14 +349,18 @@ export async function publishPage(
       .prepare(
         // Publish state is the 0001 `status` column, and `first_published_at` is
         // written once — COALESCE keeps the original across republications.
+        // `content_revision` is this row's own copy of the revision being
+        // published (R1.0), so no reader has to aggregate `page_revisions` to
+        // learn which revision is live.
         `UPDATE pages
             SET status = 'published',
                 published_at = ?,
                 first_published_at = COALESCE(first_published_at, ?),
+                content_revision = ?,
                 updated_at = ?
           WHERE id = ?`,
       )
-      .bind(timestamp, timestamp, timestamp, target.id),
+      .bind(timestamp, timestamp, revision, timestamp, target.id),
     db
       .prepare(
         // `reason` is NOT NULL and CHECKed in 0001; `created_by` is the history
@@ -355,7 +374,7 @@ export async function publishPage(
 
   const row = await db.prepare('SELECT * FROM pages WHERE id = ?').bind(target.id).first<PageRow>()
   if (!row) throw notFound('Page')
-  return toApiPage(row, revision)
+  return toApiPage(row, revisionOfPage(row))
 }
 
 export async function unpublishPage(
@@ -365,7 +384,7 @@ export async function unpublishPage(
   auditor: Auditor,
 ): Promise<Record<string, unknown>> {
   if (target.status !== 'published') {
-    return toApiPage(target, await latestRevision(db, target.id))
+    return toApiPage(target, revisionOfPage(target))
   }
 
   const timestamp = now()
@@ -384,7 +403,9 @@ export async function unpublishPage(
   await db.batch([
     db
       // `published_at` is cleared so the payload never claims a draft is live;
-      // `first_published_at` keeps the historical date.
+      // `first_published_at` keeps the historical date and `content_revision`
+      // is left untouched for the same reason — the page still has a
+      // last-published revision, it is simply not live (R1.0).
       .prepare('UPDATE pages SET status = ?, published_at = NULL, updated_at = ? WHERE id = ?')
       .bind('draft', timestamp, target.id),
     auditInsertStmt(db, entry),
@@ -392,7 +413,7 @@ export async function unpublishPage(
 
   const row = await db.prepare('SELECT * FROM pages WHERE id = ?').bind(target.id).first<PageRow>()
   if (!row) throw notFound('Page')
-  return toApiPage(row, await latestRevision(db, target.id))
+  return toApiPage(row, revisionOfPage(row))
 }
 
 /**
@@ -533,19 +554,6 @@ export async function createPageLink(
     .first<PageLinkRow>()
   if (!row) throw notFound('Page link')
   return toPageLinkDto(row)
-}
-
-export async function requireOwnedPageLink(
-  db: D1Database,
-  target: PageRow,
-  linkId: string,
-): Promise<PageLinkRow> {
-  const row = await db
-    .prepare('SELECT * FROM page_links WHERE id = ? AND page_id = ? AND deleted_at IS NULL LIMIT 1')
-    .bind(linkId, target.id)
-    .first<PageLinkRow>()
-  if (!row) throw notFound('Page link')
-  return row
 }
 
 export interface UpdatePageLinkInput {
