@@ -3,7 +3,9 @@ import { env } from 'cloudflare:workers'
 import { MAX_BIO_LENGTH, MAX_DISPLAY_NAME_LENGTH, MAX_LOCATION_LENGTH, MAX_PRONOUNS_LENGTH } from '../src/lib/constants'
 import { ulid } from '../src/lib/ids'
 import { mediaUrlFor } from '../src/lib/media'
-import type { ApiUser, AuthUser } from '../src/types'
+import { standaloneEntry } from '../src/services/audit.service'
+import { updateOwnProfile } from '../src/services/user.service'
+import type { ApiUser, Auditor, AuthUser } from '../src/types'
 import {
   TEST_PASSWORD,
   api,
@@ -42,6 +44,19 @@ interface AuditRow {
 
 function errorOf(response: { body: unknown }): ErrorEnvelope {
   return response.body as ErrorEnvelope
+}
+
+function testAuditor(): Auditor {
+  const entries: Auditor['entries'][number][] = []
+  return {
+    get handled() { return entries.length > 0 },
+    get entries() { return entries },
+    claim(draft) {
+      const entry = standaloneEntry(draft, 'profile-test-request')
+      entries.push(entry)
+      return entry
+    },
+  }
 }
 
 /** Every `user.profile_update` row, oldest first. */
@@ -126,6 +141,63 @@ describe('PATCH /api/v1/auth/me', () => {
       bio: null,
       username: user.username,
     })
+  })
+
+  it('refuses to overwrite a profile field changed in another session', async () => {
+    const user = await createTestUser()
+    const cookie = await loginAs(user)
+
+    const first = await updateProfile(cookie, {
+      displayName: 'Current name',
+      expected: { displayName: user.username },
+    })
+    expect(first.status).toBe(200)
+
+    const stale = await updateProfile(cookie, {
+      displayName: 'Stale name',
+      expected: { displayName: user.username },
+    })
+    expect(stale.status).toBe(409)
+    expect(errorOf(stale).error.code).toBe('CONFLICT')
+
+    const stored = await env.DB.prepare('SELECT display_name FROM users WHERE id = ?')
+      .bind(user.id)
+      .first<{ display_name: string | null }>()
+    expect(stored?.display_name).toBe('Current name')
+    expect(await profileAudits()).toHaveLength(1)
+  })
+
+  it('checks profile preconditions in the atomic write when a concurrent edit races', async () => {
+    const user = await createTestUser()
+    let interleaved = false
+    const racedDb = new Proxy(env.DB, {
+      get(target, key) {
+        if (key === 'batch') return async (statements: D1PreparedStatement[]) => {
+          if (!interleaved) {
+            interleaved = true
+            await env.DB.prepare('UPDATE users SET display_name = ? WHERE id = ?')
+              .bind('Concurrent name', user.id)
+              .run()
+          }
+          return target.batch(statements)
+        }
+        const value = Reflect.get(target, key)
+        return typeof value === 'function' ? value.bind(target) : value
+      },
+    })
+
+    await expect(updateOwnProfile(
+      racedDb,
+      { id: user.id, role: user.role, label: user.username },
+      { displayName: 'Stale name', expected: { displayName: user.username } },
+      testAuditor(),
+    )).rejects.toMatchObject({ status: 409 })
+
+    const stored = await env.DB.prepare('SELECT display_name FROM users WHERE id = ?')
+      .bind(user.id)
+      .first<{ display_name: string | null }>()
+    expect(stored?.display_name).toBe('Concurrent name')
+    expect((await profileAudits()).filter((entry) => entry.target_id === user.id)).toHaveLength(0)
   })
 
   it('writes a delta: a field the request omits is a field it does not touch', async () => {

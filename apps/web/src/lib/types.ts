@@ -184,6 +184,7 @@ export interface UpdateProfileInput {
   location?: string | null
   pronouns?: string | null
   username?: string
+  expected?: Partial<Pick<PublicUser, 'displayName' | 'bio' | 'location' | 'pronouns' | 'username'>>
 }
 
 /** `PATCH /auth/me` answers the identity half only — no session fields. */

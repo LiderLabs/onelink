@@ -96,10 +96,14 @@ differently on purpose:
 - **Identity** is `PATCH /api/v1/auth/me` (R1.1/R1.2). Only changed fields are sent,
   an emptied optional box is sent as `null`, and the response is *merged* over the
   session user rather than replacing it — the PATCH answer is an `ApiUser` and
-  carries no `sessionId`, `sessionExpiresAt` or `impersonatedBy`.
+  carries no `sessionId`, `sessionExpiresAt` or `impersonatedBy`. Changed fields
+  include their original values as write preconditions, so an edit from a stale
+  tab returns `409` instead of silently replacing a newer value.
 - **Social links** are `/api/v1/profile/socials` (R1.2): append, edit, reorder,
   delete. Reordering uses Move up / Move down (no drag-and-drop this pass) and
-  submits every live id, hidden rows included.
+  submits every live id, hidden rows included. Adds enforce the profile cap in
+  the same database write that assigns the next position; stale reorder requests
+  are rejected without leaving rows in temporary positions.
 - The links section is **not requested at all** for a suspended account or a
   session with an outstanding forced password change: that endpoint answers `403`
   for both, and a deliberate refusal is not an error worth rendering. An
@@ -132,7 +136,9 @@ The profile editor accepts JPEG, PNG, and static WebP files up to 10 MiB and
 zoom, reset, and choose **Save photo**. Cropping happens locally; the browser
 uploads a 512 × 512 WebP capped at 240 KiB. Cancel sends no upload. Replacement
 and confirmed removal clean up the previous photo. Unsaved profile text survives
-photo operations. Failed file cleanup has a separate retry control.
+photo operations. Failed file cleanup has a separate retry control; if upload
+compensation cannot remove an object, a tombstone lets the scheduled cleanup
+retry it.
 
 The top navbar links to **Profile** (`/app/profile`) for the photo, profile
 details, security, and session details, and **Socials** (`/app/socials`) for social

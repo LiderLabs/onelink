@@ -543,6 +543,13 @@ export interface UpdateProfileInput {
   username?: string | undefined
   avatarKey?: string | null | undefined
   expectedAvatarKey?: string | null | undefined
+  expected?: {
+    displayName?: string | undefined
+    bio?: string | null | undefined
+    location?: string | null | undefined
+    pronouns?: string | null | undefined
+    username?: string | undefined
+  } | undefined
 }
 
 /**
@@ -576,6 +583,19 @@ export async function updateOwnProfile(
 ): Promise<ApiUser> {
   const target = await requireUserById(db, actor.id)
 
+  const expected = input.expected
+  if (
+    (input.displayName !== undefined && expected?.displayName !== undefined &&
+      expected.displayName !== (target.display_name ?? target.username)) ||
+    (input.bio !== undefined && expected && 'bio' in expected && expected.bio !== target.bio) ||
+    (input.location !== undefined && expected && 'location' in expected && expected.location !== target.location) ||
+    (input.pronouns !== undefined && expected && 'pronouns' in expected && expected.pronouns !== target.pronouns) ||
+    (input.username !== undefined && expected?.username !== undefined &&
+      expected.username !== target.username)
+  ) {
+    throw conflict('These profile details changed in another session. Reload and try again.')
+  }
+
   const avatarChange = input.avatarKey !== undefined
   const expectedAvatarKey = input.expectedAvatarKey === undefined ? target.avatar_key : input.expectedAvatarKey
   if (avatarChange) {
@@ -592,6 +612,29 @@ export async function updateOwnProfile(
       if (!asset) throw notFound('Photo')
     }
     if (target.avatar_key !== expectedAvatarKey) throw conflict('Your profile photo changed. Reload it and try again.')
+  }
+
+  const profileConditions: string[] = []
+  const profileConditionBinds: unknown[] = []
+  if (input.displayName !== undefined && expected?.displayName !== undefined) {
+    profileConditions.push('COALESCE(display_name, username) IS ?')
+    profileConditionBinds.push(expected.displayName)
+  }
+  if (input.bio !== undefined && expected && 'bio' in expected) {
+    profileConditions.push('bio IS ?')
+    profileConditionBinds.push(expected.bio ?? null)
+  }
+  if (input.location !== undefined && expected && 'location' in expected) {
+    profileConditions.push('location IS ?')
+    profileConditionBinds.push(expected.location ?? null)
+  }
+  if (input.pronouns !== undefined && expected && 'pronouns' in expected) {
+    profileConditions.push('pronouns IS ?')
+    profileConditionBinds.push(expected.pronouns ?? null)
+  }
+  if (input.username !== undefined && expected?.username !== undefined) {
+    profileConditions.push('username IS ?')
+    profileConditionBinds.push(expected.username)
   }
 
   const patch: string[] = []
@@ -666,14 +709,25 @@ export async function updateOwnProfile(
 
   const eligibility = avatarChange && input.avatarKey !== null
     ? " AND EXISTS (SELECT 1 FROM media_assets WHERE r2_key=? AND owner_user_id=? AND status='active' AND kind='avatar' AND bucket='public')" : ''
+  const expectedFields = profileConditions.length > 0 ? ` AND ${profileConditions.join(' AND ')}` : ''
   const results = await db.batch([
-    db.prepare(`UPDATE users SET ${patch.join(', ')}, updated_at = ? WHERE id = ?${avatarChange ? ' AND avatar_key IS ?' : ''}${eligibility}`)
-      .bind(...binds, timestamp, target.id, ...(avatarChange ? [expectedAvatarKey] : []), ...(eligibility ? [input.avatarKey, target.id] : [])),
-    auditInsertStmt(db, entry, avatarChange),
+    db.prepare(`UPDATE users SET ${patch.join(', ')}, updated_at = ? WHERE id = ?${avatarChange ? ' AND avatar_key IS ?' : ''}${expectedFields}${eligibility}`)
+      .bind(
+        ...binds,
+        timestamp,
+        target.id,
+        ...(avatarChange ? [expectedAvatarKey] : []),
+        ...profileConditionBinds,
+        ...(eligibility ? [input.avatarKey, target.id] : []),
+      ),
+    auditInsertStmt(db, entry, avatarChange || profileConditions.length > 0),
   ])
   if (avatarChange && results[0]?.meta.changes !== 1) {
     await auditInsertStmt(db, { ...entry, status: 'denied', after: null }).run()
     throw conflict('Your profile photo changed. Reload it and try again.')
+  }
+  if (profileConditions.length > 0 && results[0]?.meta.changes !== 1) {
+    throw conflict('These profile details changed in another session. Reload and try again.')
   }
   return toApiUser(await requireUserById(db, target.id))
 }

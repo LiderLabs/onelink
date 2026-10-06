@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { env } from 'cloudflare:workers'
 import { MAX_SOCIAL_LINKS_PER_USER } from '../src/lib/constants'
 import { ulid } from '../src/lib/ids'
-import type { UserSocialLinkRow } from '../src/types'
+import { reorderSocialLinks } from '../src/services/profile.service'
+import { standaloneEntry } from '../src/services/audit.service'
+import type { Auditor, UserSocialLinkRow } from '../src/types'
 import {
   TEST_PASSWORD,
   api,
@@ -48,6 +50,19 @@ const SOCIALS = '/api/v1/profile/socials'
 
 function errorOf(response: { body: unknown }): ErrorEnvelope {
   return response.body as ErrorEnvelope
+}
+
+function testAuditor(): Auditor {
+  const entries: Auditor['entries'][number][] = []
+  return {
+    get handled() { return entries.length > 0 },
+    get entries() { return entries },
+    claim(draft) {
+      const entry = standaloneEntry(draft, 'social-test-request')
+      entries.push(entry)
+      return entry
+    },
+  }
 }
 
 function listSocials(cookie: string) {
@@ -256,6 +271,24 @@ describe('POST /api/v1/profile/socials', () => {
     expect(errorOf(refused).error.message).toContain(String(MAX_SOCIAL_LINKS_PER_USER))
     expect(await socialRows(user.id)).toHaveLength(MAX_SOCIAL_LINKS_PER_USER)
   })
+
+  it('enforces the profile cap when concurrent requests race for the final slot', async () => {
+    const user = await createTestUser()
+    const cookie = await loginAs(user)
+    for (let index = 0; index < MAX_SOCIAL_LINKS_PER_USER - 1; index++) {
+      expect((await createSocial(cookie, {
+        platform: 'github',
+        url: `https://github.com/ada/concurrent-${index}`,
+      })).status).toBe(201)
+    }
+
+    const results = await Promise.all([
+      createSocial(cookie, { platform: 'github', url: 'https://github.com/ada/race-a' }),
+      createSocial(cookie, { platform: 'github', url: 'https://github.com/ada/race-b' }),
+    ])
+    expect(results.map((result) => result.status).sort()).toEqual([201, 400])
+    expect(await socialRows(user.id)).toHaveLength(MAX_SOCIAL_LINKS_PER_USER)
+  })
 })
 
 describe('GET /api/v1/profile/socials', () => {
@@ -409,6 +442,47 @@ describe('PUT /api/v1/profile/socials/order', () => {
     expect(JSON.parse(reorder?.after ?? '{}')).toEqual({
       order: [third.body.data.id, first.body.data.id, second.body.data.id],
     })
+  })
+
+  it('leaves a concurrently added link in a valid position when a stale reorder arrives', async () => {
+    const user = await createTestUser()
+    const actor = { id: user.id, role: user.role, label: user.username }
+    const cookie = await loginAs(user)
+    const first = await createSocial(cookie, { platform: 'github', url: 'https://github.com/ada' })
+    const second = await createSocial(cookie, { platform: 'x', url: 'https://x.com/ada' })
+    let interleaved = false
+    const racedDb = new Proxy(env.DB, {
+      get(target, key) {
+        if (key === 'batch') return async (statements: D1PreparedStatement[]) => {
+          if (!interleaved) {
+            interleaved = true
+            const timestamp = Date.now()
+            await env.DB.prepare(
+              `INSERT INTO user_social_links
+                 (id,user_id,platform,url,position,is_visible,created_at,updated_at)
+               VALUES (?,?,?, ?,2,1,?,?)`,
+            ).bind(ulid(), user.id, 'bluesky', 'https://bsky.app/ada', timestamp, timestamp).run()
+          }
+          return target.batch(statements)
+        }
+        const value = Reflect.get(target, key)
+        return typeof value === 'function' ? value.bind(target) : value
+      },
+    })
+
+    await expect(reorderSocialLinks(
+      racedDb,
+      actor,
+      [second.body.data.id, first.body.data.id],
+      testAuditor(),
+    )).rejects.toMatchObject({ status: 400 })
+
+    const rows = await socialRows(user.id)
+    expect(rows.map((row) => row.position)).toEqual([0, 1, 2])
+    expect(rows.map((row) => row.platform)).toContain('bluesky')
+    expect((await socialAudits()).filter(
+      (entry) => entry.action === 'profile.socials.reorder' && entry.target_id === user.id,
+    )).toHaveLength(0)
   })
 
   it('closes the gap a delete left behind', async () => {
@@ -611,6 +685,3 @@ describe('write budget', () => {
     expect(await socialRows(user.id)).toHaveLength(1)
   })
 })
-
-
-

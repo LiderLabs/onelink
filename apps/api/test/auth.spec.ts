@@ -137,6 +137,28 @@ describe('POST /api/v1/auth/login', () => {
     expect(locked.headers.get('retry-after')).toBeTruthy()
   })
 
+  it('counts concurrent failed attempts when enforcing the lockout threshold', async () => {
+    const user = await createTestUser()
+    await env.DB.prepare('UPDATE users SET failed_login_count = ? WHERE id = ?')
+      .bind(MAX_FAILED_LOGINS - 2, user.id)
+      .run()
+
+    const attempts = await Promise.all(
+      Array.from({ length: 2 }, () =>
+        api('POST', '/api/v1/auth/login', {
+          body: { identifier: user.username, password: 'definitely-not-the-password' },
+        }),
+      ),
+    )
+
+    expect(attempts.map((response) => response.status)).toEqual([401, 401])
+    const locked = await api('POST', '/api/v1/auth/login', {
+      body: { identifier: user.email, password: TEST_PASSWORD },
+    })
+    expect(locked.status).toBe(423)
+    expect((locked.body as ErrorEnvelope).error.code).toBe('ACCOUNT_LOCKED')
+  })
+
   it('verifies the password BEFORE revealing that a banned account is banned', async () => {
     const user = await createTestUser({ status: 'banned' })
 
@@ -346,4 +368,3 @@ describe('password reset', () => {
     expect(response.status).toBe(400)
   })
 })
-

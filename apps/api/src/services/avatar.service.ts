@@ -27,8 +27,36 @@ export async function uploadAvatar(
       auditInsertStmt(env.DB, entry),
     ])
   } catch (error) {
-    try { await env.PUBLIC_BUCKET.delete(key) } catch {
-      console.error(JSON.stringify({ level: 'error', msg: 'media_upload_compensation_failed', key, requestId: entry.requestId }))
+    try {
+      await env.PUBLIC_BUCKET.delete(key)
+    } catch (cleanupError) {
+      try {
+        const timestamp = now()
+        await env.DB.prepare(
+          `INSERT INTO media_assets
+             (id,owner_user_id,r2_key,bucket,kind,mime,size_bytes,width,height,uploaded_by,status,created_at,deleted_at)
+           VALUES (?,?,?,'public','avatar',?,?,?,?,?,'deleted',?,?)
+           ON CONFLICT(id) DO UPDATE SET status='deleted', deleted_at=coalesce(deleted_at, excluded.deleted_at)`,
+        )
+          .bind(id, actor.id, key, image.mime, image.bytes, image.width, image.height, actor.id, timestamp, timestamp)
+          .run()
+        console.error(JSON.stringify({
+          level: 'warn',
+          msg: 'media_upload_cleanup_deferred',
+          key,
+          requestId: entry.requestId,
+          message: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+        }))
+      } catch (trackingError) {
+        console.error(JSON.stringify({
+          level: 'error',
+          msg: 'media_upload_compensation_failed',
+          key,
+          requestId: entry.requestId,
+          cleanupError: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+          trackingError: trackingError instanceof Error ? trackingError.message : String(trackingError),
+        }))
+      }
     }
     throw error
   }

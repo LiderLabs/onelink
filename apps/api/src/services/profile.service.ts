@@ -3,7 +3,6 @@ import { MAX_SOCIAL_LINKS_PER_USER, SOCIAL_PLATFORMS } from '../lib/constants'
 import { badRequest, notFound } from '../lib/errors'
 import { normalizeUrl } from '../lib/http'
 import { ulid } from '../lib/ids'
-import { asCount } from '../lib/query'
 import { auditInsertStmt } from './audit.service'
 import { toSocialLinkDto } from './mappers'
 import type { ActorInfo, Auditor, UserSocialLinkRow } from '../types'
@@ -120,20 +119,6 @@ export async function createSocialLink(
   const url = normalizeUrl(input.url)
   if (!url) throw badRequest('That URL is not a usable http(s) address.')
 
-  const countRow = await db
-    .prepare('SELECT count(*) AS total FROM user_social_links WHERE user_id = ?')
-    .bind(actor.id)
-    .first<{ total?: unknown }>()
-  if (asCount(countRow) >= MAX_SOCIAL_LINKS_PER_USER) {
-    throw badRequest(`A profile may hold at most ${MAX_SOCIAL_LINKS_PER_USER} social links.`)
-  }
-
-  const top = await db
-    .prepare('SELECT COALESCE(MAX(position), -1) AS top FROM user_social_links WHERE user_id = ?')
-    .bind(actor.id)
-    .first<{ top: number }>()
-  const position = (top?.top ?? -1) + 1
-
   const isVisible = input.isVisible !== false
   const timestamp = now()
   const socialId = ulid()
@@ -146,20 +131,37 @@ export async function createSocialLink(
     actorUserId: actor.id,
     actorRole: actor.role,
     actorLabel: actor.label,
-    metadata: { socialId, position },
+    metadata: { socialId },
     after: { platform, url, isVisible },
   })
 
-  await db.batch([
+  const results = await db.batch([
     db
       .prepare(
         `INSERT INTO user_social_links (
            id, user_id, platform, url, position, is_visible, created_at, updated_at
-         ) VALUES (?,?,?,?,?,?,?,?)`,
+         )
+         SELECT ?, ?, ?, ?, COALESCE(MAX(position), -1) + 1, ?, ?, ?
+           FROM user_social_links
+          WHERE user_id = ?
+         HAVING COUNT(*) < ?`,
       )
-      .bind(socialId, actor.id, platform, url, position, isVisible ? 1 : 0, timestamp, timestamp),
-    auditInsertStmt(db, entry),
+      .bind(
+        socialId,
+        actor.id,
+        platform,
+        url,
+        isVisible ? 1 : 0,
+        timestamp,
+        timestamp,
+        actor.id,
+        MAX_SOCIAL_LINKS_PER_USER,
+      ),
+    auditInsertStmt(db, entry, true),
   ])
+  if (results[0]?.meta.changes !== 1) {
+    throw badRequest(`A profile may hold at most ${MAX_SOCIAL_LINKS_PER_USER} social links.`)
+  }
 
   const row = await db
     .prepare('SELECT * FROM user_social_links WHERE id = ?')
@@ -317,6 +319,8 @@ export async function reorderSocialLinks(
   }
 
   const timestamp = now()
+  const ids = socialIds.map(() => '?').join(', ')
+  const expectedOrder = socialIds.map(() => '(id = ? AND position = ?)').join(' OR ')
   const entry = auditor.claim({
     action: 'profile.socials.reorder',
     targetType: 'user',
@@ -330,18 +334,43 @@ export async function reorderSocialLinks(
 
   const statements: D1PreparedStatement[] = [
     db
-      .prepare('UPDATE user_social_links SET position = -1 - position WHERE user_id = ?')
-      .bind(actor.id),
+      .prepare(
+        `UPDATE user_social_links
+            SET position = -1 - position
+          WHERE user_id = ?
+            AND (SELECT COUNT(*) FROM user_social_links WHERE user_id = ?) = ?
+            AND (SELECT COUNT(*) FROM user_social_links WHERE user_id = ? AND id IN (${ids})) = ?`,
+      )
+      .bind(actor.id, actor.id, socialIds.length, actor.id, ...socialIds, socialIds.length),
     ...socialIds.map((id, index) =>
       db
         .prepare(
-          'UPDATE user_social_links SET position = ?, updated_at = ? WHERE id = ? AND user_id = ?',
+          `UPDATE user_social_links SET position = ?, updated_at = ?
+            WHERE id = ? AND user_id = ? AND position < 0`,
         )
         .bind(index, timestamp, id, actor.id),
     ),
-    auditInsertStmt(db, entry),
+    db
+      .prepare(
+        `UPDATE users SET updated_at = updated_at
+          WHERE id = ?
+            AND (SELECT COUNT(*) FROM user_social_links WHERE user_id = ?) = ?
+            AND (SELECT COUNT(*) FROM user_social_links WHERE user_id = ? AND (${expectedOrder})) = ?`,
+      )
+      .bind(
+        actor.id,
+        actor.id,
+        socialIds.length,
+        actor.id,
+        ...socialIds.flatMap((id, index) => [id, index]),
+        socialIds.length,
+      ),
+    auditInsertStmt(db, entry, true),
   ]
-  await db.batch(statements)
+  const results = await db.batch(statements)
+  if (results[0]?.meta.changes !== socialIds.length) {
+    throw badRequest('The ordering changed while it was being saved. Reload the list and try again.')
+  }
 
   return listSocialLinkDtos(db, actor.id)
 }

@@ -326,9 +326,6 @@ async function registerFailedLogin(
   timestamp: number,
   auditor: Auditor,
 ): Promise<void> {
-  const attempts = user.failed_login_count + 1
-  const lockUntil = attempts >= MAX_FAILED_LOGINS ? addMs(timestamp, LOCKOUT_MS) : null
-
   const entry = auditor.claim({
     action: 'auth.login.failed',
     status: 'denied',
@@ -338,17 +335,33 @@ async function registerFailedLogin(
     actorUserId: user.id,
     actorLabel: user.email,
     actorRole: user.role,
-    metadata: { attempts, lockedUntil: lockUntil },
   })
 
   await db.batch([
     db
       .prepare(
-        'UPDATE users SET failed_login_count = ?, locked_until = ?, updated_at = ? WHERE id = ?',
+        `UPDATE users
+            SET failed_login_count = CASE
+                  WHEN failed_login_count + 1 >= ? THEN 0
+                  ELSE failed_login_count + 1
+                END,
+                locked_until = CASE
+                  WHEN failed_login_count + 1 >= ? THEN ?
+                  ELSE NULL
+                END,
+                updated_at = ?
+          WHERE id = ? AND (locked_until IS NULL OR locked_until <= ?)`,
       )
-      // The counter resets when the account locks, so the window restarts
-      // cleanly once the lockout lapses.
-      .bind(lockUntil === null ? attempts : 0, lockUntil, timestamp, user.id),
+      // Increment from the database's current value, not the potentially stale
+      // row read before password verification; concurrent failures must all count.
+      .bind(
+        MAX_FAILED_LOGINS,
+        MAX_FAILED_LOGINS,
+        addMs(timestamp, LOCKOUT_MS),
+        timestamp,
+        user.id,
+        timestamp,
+      ),
     auditInsertStmt(db, entry),
   ])
 }
@@ -863,4 +876,3 @@ export async function consumePasswordReset(
     revokedSessions: results[3]?.meta.changes ?? 0,
   }
 }
-

@@ -81,12 +81,29 @@ function cleared(raw: string): string | null {
 /** Only the keys that actually moved. */
 function diffIdentity(values: IdentityDraft, original: IdentityDraft): UpdateProfileInput {
   const patch: UpdateProfileInput = {}
+  const expected: NonNullable<UpdateProfileInput['expected']> = {}
 
-  if (values.displayName !== original.displayName) patch.displayName = values.displayName.trim()
-  if (values.username !== original.username) patch.username = values.username.trim()
-  if (values.bio !== original.bio) patch.bio = cleared(values.bio)
-  if (values.location !== original.location) patch.location = cleared(values.location)
-  if (values.pronouns !== original.pronouns) patch.pronouns = cleared(values.pronouns)
+  if (values.displayName !== original.displayName) {
+    patch.displayName = values.displayName.trim()
+    expected.displayName = original.displayName
+  }
+  if (values.username !== original.username) {
+    patch.username = values.username.trim()
+    expected.username = original.username
+  }
+  if (values.bio !== original.bio) {
+    patch.bio = cleared(values.bio)
+    expected.bio = original.bio || null
+  }
+  if (values.location !== original.location) {
+    patch.location = cleared(values.location)
+    expected.location = original.location || null
+  }
+  if (values.pronouns !== original.pronouns) {
+    patch.pronouns = cleared(values.pronouns)
+    expected.pronouns = original.pronouns || null
+  }
+  if (Object.keys(expected).length > 0) patch.expected = expected
 
   return patch
 }

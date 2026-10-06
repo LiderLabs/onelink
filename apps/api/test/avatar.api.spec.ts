@@ -3,6 +3,7 @@ import { env } from 'cloudflare:workers'
 import { avatarWebp } from './fixtures/media'
 import { api, rawApi, createTestUser, loginAs, impersonatedCookieFor, resetIsolateCaches, type Envelope, type ErrorEnvelope } from './helpers'
 import { uploadAvatar, deleteOwnedAvatar } from '../src/services/avatar.service'
+import { cleanupAvatarMedia } from '../src/services/media-maintenance.service'
 import { updateOwnProfile } from '../src/services/user.service'
 import { standaloneEntry } from '../src/services/audit.service'
 import type { Auditor, MediaDto } from '../src/types'
@@ -84,18 +85,28 @@ describe('avatar upload and public serving', () => {
     expect((await rawApi('GET',media.url)).status).toBe(404)
     expect((await rawApi('GET','/api/v1/media/files/avatars/u/invalid.webp')).status).toBe(404)
   })
-  it('compensates a failed database commit and logs failed compensation safely',async()=>{
+  it('tracks failed storage compensation so scheduled cleanup can retry it',async()=>{
     const user=await createTestUser(), actor={id:user.id,role:user.role,label:user.username}
     const failedDb=new Proxy(env.DB,{get(target,key){if(key==='batch')return async()=>{throw new Error('injected commit failure')};const v=Reflect.get(target,key);return typeof v==='function'?v.bind(target):v}})
     await expect(uploadAvatar({...env,DB:failedDb},actor,avatarWebp(),'image/webp',auditor())).rejects.toThrow('injected commit failure')
     expect((await env.PUBLIC_BUCKET.list()).objects).toHaveLength(0)
     const failedBucket=new Proxy(env.PUBLIC_BUCKET,{get(target,key){if(key==='delete')return async()=>{throw new Error('injected cleanup failure')};const v=Reflect.get(target,key);return typeof v==='function'?v.bind(target):v}})
     const log=vi.spyOn(console,'error').mockImplementation(()=>{})
+    let deferredKey: string | null = null
     try{
-      await expect(uploadAvatar({...env,DB:failedDb,PUBLIC_BUCKET:failedBucket},actor,avatarWebp(),'image/webp',auditor())).rejects.toThrow('injected commit failure')
-      expect(log).toHaveBeenCalledWith(expect.stringContaining('media_upload_compensation_failed'))
+      await expect(uploadAvatar({...env,DB:failedDb,PUBLIC_BUCKET:failedBucket},actor,avatarWebp(),'image/webp',auditor()))
+        .rejects.toThrow('injected commit failure')
+      const tracked = await env.DB.prepare(
+        "SELECT id,r2_key,status FROM media_assets WHERE owner_user_id=? AND status='deleted' ORDER BY created_at DESC LIMIT 1",
+      ).bind(user.id).first<{ id: string; r2_key: string; status: string }>()
+      deferredKey = tracked?.r2_key ?? null
+      expect(tracked?.status).toBe('deleted')
+      expect(log).toHaveBeenCalledWith(expect.stringContaining('media_upload_cleanup_deferred'))
       expect(log).toHaveBeenCalledWith(expect.stringContaining('media-test-request'))
     }finally{log.mockRestore()}
+    expect(deferredKey).not.toBeNull()
+    expect(await cleanupAvatarMedia(env)).toMatchObject({ removed: 1, failed: 0 })
+    expect(await env.PUBLIC_BUCKET.get(deferredKey!)).toBeNull()
   })
 })
 

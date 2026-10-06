@@ -105,6 +105,13 @@ export const updateProfileSchema = z
     avatarKey: avatarKeySchema.nullable().optional(),
     username: usernameSchema.optional(),
     expectedAvatarKey: avatarKeySchema.nullable().optional(),
+    expected: z.strictObject({
+      displayName: z.string().optional(),
+      bio: z.string().nullable().optional(),
+      location: z.string().nullable().optional(),
+      pronouns: z.string().nullable().optional(),
+      username: z.string().optional(),
+    }).optional(),
     // R1.2 added `location` and `pronouns` above, exactly as R1.1 promised.
     // R1.3 lands `avatarKey`: the SHAPE is checked here, ownership against
     // `media_assets` is checked in the service before the key is ever trusted.
@@ -114,6 +121,12 @@ export const updateProfileSchema = z
   })
   .refine(value => value.expectedAvatarKey === undefined || value.avatarKey !== undefined, {
     error: 'Supply a profile photo change with its current key.', path: ['avatarKey'],
+  })
+  .refine(value => value.expected === undefined || Object.keys(value.expected).every(key =>
+    key in value && key !== 'expected'
+  ), {
+    error: 'Expected profile values must match fields being updated.',
+    path: ['expected'],
   })
 
 export type UpdateProfileBody = z.infer<typeof updateProfileSchema>
