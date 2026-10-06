@@ -185,7 +185,7 @@ export default async (page) => {
             ...(failureCase.responseHeaders ? { responseHeaders: failureCase.responseHeaders } : {}),
             ...(failureCase.event ? { event: failureCase.event } : {}),
           },
-          () => uploadAvatar(webp),
+          () => uploadAvatar(webp, {}),
         ),
       )
       seen.push({ name: failureCase.name, request, sent: [...sent] })
@@ -211,7 +211,7 @@ export default async (page) => {
       const request = await outcome(() =>
         taped({ status: 201, body: envelope(media), event: 'progress-only', progress: [[10, 100]] }, () =>
           Promise.race([
-            uploadAvatar(webp).then(
+            uploadAvatar(webp, {}).then(
               () => 'resolved',
               () => 'rejected',
             ),
