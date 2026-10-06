@@ -87,7 +87,7 @@ settings, email templates, rate limits) and `0002_pages_theme_and_scheduling.sql
 (adds page theme/layout/accent/branding, link `description`, link `starts_at`/
 `ends_at`). Both are additive-only and STRICT.
 
-Tables with **no route or service touching them yet**: `media_assets`, `reports`,
+Tables with **no route or service touching them yet**: `reports`,
 `appeals`, `content_flags`, `report_actions`, `invitations` (staff-shaped only).
 `slug_reservations` is used, but only internally.
 
@@ -255,13 +255,19 @@ Cheap now, expensive later. Backend only — no frontend or schema change.
 | **Exit** | The identity a public page renders — name, bio, location, pronouns, socials — is fully writable by its owner and by nobody else. |
 | **UI** 🎨 | Profile fields, socials editor, live preview. |
 
-### R1.3 — Media API ⏳
+### R1.3 — Media API (avatars complete; page images pending)
+
+Profile photos are implemented: owned uploads and public serving, conditional
+attachment, recoverable retirement/removal, and bounded daily cleanup. The API
+accepts only validated 512-square WebP avatars up to 240 KiB. The browser accepts
+JPEG/PNG/static WebP and supplies crop/resize without new runtime dependencies.
+Other media kinds and link thumbnails remain future work.
 
 | | |
 | --- | --- |
-| **Schema** | none. `media_assets` already CHECKs `kind` over `'avatar' \| 'page_image' \| …`, and `media_upload_user` (60/h, throttle) is already seeded — the binding and the policy exist, only the endpoints do not. |
-| **API** | `POST /api/v1/media` — validate type and size server-side, write the object to `PUBLIC_BUCKET`, insert the `media_assets` row, return `{ id, key, url, width, height, bytes }`. `DELETE /api/v1/media/:id`, ownership-checked. Attach an avatar through R1.1's `PATCH /auth/me { avatarKey }`; a link thumbnail uses the same endpoint. |
-| **Rules** | Keys are namespaced per owner (`avatars/{userId}/{ulid}.webp`) so one account can never overwrite another's object. Never trust the client `Content-Type` — sniff magic bytes, cap dimensions, cap bytes. Delete the R2 object **before** the row: a dangling row is recoverable, a dangling object is not. |
+| **Schema** | no migration. Existing `media_assets` and `media_upload_user` (60/h, throttle) are used. |
+| **API** | `POST /api/v1/media?kind=avatar`, owned `GET /media/avatar`, public `GET /media/files/avatars/:ownerId/:filename`, and owned `DELETE /media/:id`. Attach using `PATCH /auth/me { avatarKey, expectedAvatarKey }`. Page images and thumbnails remain planned. |
+| **Rules** | Owner-namespaced immutable keys; server validates WebP container, dimensions, and bytes. Atomically mark retired and clear a matching profile pointer, then delete R2 before deleting the row. Retired rows are recoverable; maintenance rechecks unattached candidates. |
 | **Tests** | `media.api.spec.ts`: reject oversized and unknown types, ownership enforcement, key namespacing (two users, same filename, distinct keys), `429` on the seeded throttle, delete clears object and row. |
 | **Exit** | An avatar uploads, attaches, serves and deletes; `PUBLIC_BUCKET` has stopped being an unused binding. |
 | **UI** 🎨 | In-browser crop and resize (**D4**). The API stops at "store exactly the bytes you were given". |
@@ -496,7 +502,7 @@ uses, which is the only way the `__Host-` cookie behaves at all.
 | Profile: name, bio | R1.1 | `PATCH /auth/me` does **not** exist |
 | Profile: location, pronouns | R1.2 | no columns |
 | Social links | R1.2 | no table |
-| Avatar upload / crop | R1.3 | `media_assets` table, no endpoints |
+| Avatar upload / crop | R1.3 | implemented: owned API, browser crop, replace/remove |
 | Page address + rename | R1.4 | slug immutable by design |
 | Link groups | R1.5 | no table |
 | Open in new tab | R1.5 | no column |

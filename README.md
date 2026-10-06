@@ -113,7 +113,7 @@ normalized values, so the second submit diffs against what is actually stored.
 ## Tests and typecheck
 
 ```bash
-npm test          # 171 API tests in 7 files, run in workerd against a local D1
+npm test          # 199 API tests in 10 files, run in workerd against local D1/R2
 npm run typecheck # regenerates worker-configuration.d.ts, then typechecks both workspaces
 ```
 
@@ -124,6 +124,37 @@ runner of its own, and `npm --workspace apps/web run build` (which runs
 
 `worker-configuration.d.ts` is generated and gitignored, so run typechecks from
 the root (the workspace script only runs `tsc`) or run `npm run types` first.
+
+### Profile photos
+
+The profile editor accepts JPEG, PNG, and static WebP files up to 10 MiB and
+40 million decoded pixels. Drag or use arrow keys to position the square crop,
+zoom, reset, and choose **Save photo**. Cropping happens locally; the browser
+uploads a 512 × 512 WebP capped at 240 KiB. Cancel sends no upload. Replacement
+and confirmed removal clean up the previous photo. Unsaved profile text survives
+photo operations. Failed file cleanup has a separate retry control.
+
+`POST /api/v1/media?kind=avatar` accepts raw WebP, `GET /api/v1/media/avatar`
+returns current metadata, and `DELETE /api/v1/media/:id` retires owned avatars.
+Attachment uses `PATCH /api/v1/auth/me` with `avatarKey` and `expectedAvatarKey`
+to detect concurrent edits. Daily maintenance retries retired files and removes
+unattached uploads older than 24 hours. Page image uploads remain planned.
+
+Start the API with `npm run dev` and the web app with `npm run dev:web` in two
+terminals. Open the Vite URL. Browser checks use Playwright CLI and local test
+accounts; run them from the checkout that owns the browser session:
+
+```bash
+npx @playwright/cli open http://127.0.0.1:5173
+npx @playwright/cli run-code --filename=scripts/browser/profile-photo-image-check.js
+npx @playwright/cli run-code --filename=scripts/browser/profile-photo-flow-check.js
+npx @playwright/cli run-code --filename=scripts/browser/profile-photo-ui-check.js
+npx @playwright/cli run-code --filename=scripts/browser/profile-photo-state-check.js
+```
+
+The flow check creates a disposable local account used by the UI check.
+The state check runs after the flow check and captures mobile and
+desktop crop screenshots under `output/playwright/`.
 
 ## Deploying
 
