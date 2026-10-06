@@ -154,24 +154,25 @@ export function SocialsEditor({ readable, writable, blockedReason }: SocialsEdit
   }
 
   return (
-    <section aria-labelledby="socials" className="mt-12">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 id="socials" className="eyebrow">
-          Social links
-        </h2>
+    <section aria-labelledby="socials" className="profile-section profile-socials">
+      <div className="profile-section-heading">
+        <div>
+          <p className="profile-section-number" aria-hidden="true">02</p>
+          <h2 id="socials">Social links</h2>
+        </div>
         {readable ? (
-          <p className="eyebrow">
-            {list.length} of {MAX_SOCIALS_PER_PROFILE} used
+          <p className="profile-section-note">
+            {list.length} / {MAX_SOCIALS_PER_PROFILE} links
           </p>
         ) : null}
       </div>
 
-      <p className="mt-3 max-w-prose text-sm leading-relaxed text-ink-soft">
-        Where else you are. This order is the order they appear in; a new link is always appended.
+      <p className="profile-section-description">
+        Connect the places you share your work. Arrange them in the order you want people to see.
       </p>
 
       {!readable ? (
-        <Notice tone="info" label="Not requested" className="mt-5">
+        <Notice tone="info" label="Social links unavailable" className="mt-5">
           {blockedReason}
         </Notice>
       ) : (
@@ -200,9 +201,8 @@ export function SocialsEditor({ readable, writable, blockedReason }: SocialsEdit
               delay={1}
             />
           ) : list.length === 0 ? (
-            <EmptyState title="No social links yet" delay={1}>
-              Add the places you actually post — a website, a portfolio, a profile. Up to{' '}
-              {MAX_SOCIALS_PER_PROFILE} of them, in whatever order you like.
+            <EmptyState title="Your world, connected" delay={1}>
+              Add your website, portfolio, or a place you like to post. Your first link starts below.
             </EmptyState>
           ) : (
             <ul className="mt-6 border-t border-rule">
@@ -216,7 +216,10 @@ export function SocialsEditor({ readable, writable, blockedReason }: SocialsEdit
                   busy={pending}
                   onMove={(position, delta) => void move(position, delta)}
                   onDelete={setConfirming}
-                  onSaved={setNotice}
+                  onSaved={(message) => {
+                    setNotice(message)
+                    socials.reload()
+                  }}
                 />
               ))}
             </ul>
@@ -229,7 +232,7 @@ export function SocialsEditor({ readable, writable, blockedReason }: SocialsEdit
           ) : null}
 
           {writable && !atCap ? (
-            <form onSubmit={(event) => void add(event)} noValidate className="mt-8 space-y-5">
+            <form onSubmit={(event) => void add(event)} noValidate className="profile-social-add mt-8 space-y-5">
               <p className="eyebrow">Add a social link</p>
 
               <div className="grid gap-5 sm:grid-cols-2">
@@ -250,14 +253,14 @@ export function SocialsEditor({ readable, writable, blockedReason }: SocialsEdit
                   value={url}
                   maxLength={MAX_SOCIAL_URL_LENGTH}
                   disabled={pending}
-                  hint="http or https only. Credentials in the address are stripped."
+                  hint="A full address starting with https:// or http://."
                   error={fieldErrors.url ?? null}
                   onChange={(event) => setUrl(event.target.value)}
                 />
               </div>
 
               <CheckboxField
-                label="Visible"
+                label="Show on my page"
                 checked={visible}
                 disabled={pending}
                 hint="A hidden link stays in this list but is left out of your published page."

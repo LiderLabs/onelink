@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useMatch } from 'react-router-dom'
 import { ConsoleNav } from './ConsoleNav'
 
 // ============================================================================
@@ -16,6 +16,8 @@ import { ConsoleNav } from './ConsoleNav'
 // ============================================================================
 
 export function ConsoleLayout() {
+  const profileMatch = useMatch('/app/profile')
+  if (profileMatch) return <Outlet />
   return (
     <div className="grid gap-8 lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-14">
       <ConsoleNav />

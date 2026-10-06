@@ -13,7 +13,10 @@ worker-configuration.d.ts
 !.dev.vars.example
 
 # Generated / scratch
+.worktrees/
 scripts/.tmp/
+.playwright-cli/
+output/playwright/
 *.log
 npm-debug.log*
 # Local test-run captures (e.g. `npm test > vitest-out.txt`)
