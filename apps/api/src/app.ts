@@ -18,6 +18,7 @@ import { publicRoutes } from './routes/public'
 import { authRoutes } from './routes/auth'
 import { pageRoutes } from './routes/pages'
 import { profileRoutes } from './routes/profile'
+import { mediaRoutes } from './routes/media'
 import { userRoutes } from './routes/users'
 import { settingsRoutes } from './routes/settings'
 import { auditRoutes } from './routes/audit'
@@ -80,7 +81,7 @@ export function createApp() {
       credentials: true,
       allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
       allowHeaders: ['content-type', 'x-request-id'],
-      exposeHeaders: ['x-request-id', 'x-ratelimit-limit', 'x-ratelimit-remaining', 'x-ratelimit-reset'],
+      exposeHeaders: ['x-request-id', 'x-ratelimit-limit', 'x-ratelimit-remaining', 'x-ratelimit-reset', 'retry-after'],
       maxAge: 600,
     })(c, next)
   })
@@ -110,6 +111,7 @@ export function createApp() {
   app.route('/api/v1/auth', authRoutes)
   app.route('/api/v1/pages', pageRoutes)
   app.route('/api/v1/profile', profileRoutes)
+  app.route('/api/v1/media', mediaRoutes)
   app.route('/api/v1/admin/users', userRoutes)
   app.route('/api/v1/admin/settings', settingsRoutes)
   app.route('/api/v1/admin/audit-logs', auditRoutes)

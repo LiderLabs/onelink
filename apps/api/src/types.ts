@@ -42,6 +42,34 @@ export interface UserRow {
   deleted_by: string | null
 }
 
+export interface MediaAssetRow {
+  id: string
+  owner_user_id: string | null
+  page_id: string | null
+  r2_key: string
+  bucket: 'public' | 'private'
+  kind: 'avatar' | 'page_image' | 'report_evidence' | 'appeal_evidence'
+  original_filename: string | null
+  mime: string
+  size_bytes: number
+  width: number | null
+  height: number | null
+  checksum: string | null
+  uploaded_by: string | null
+  status: 'active' | 'deleted'
+  created_at: number
+  deleted_at: number | null
+}
+
+export interface MediaDto {
+  id: string
+  key: string
+  url: string
+  width: number
+  height: number
+  bytes: number
+}
+
 export interface SessionRow {
   id: string
   user_id: string

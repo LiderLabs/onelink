@@ -309,6 +309,26 @@ const VOLATILE_TABLES = [
  * failure looks like a bug in the code under test rather than in the fixture.
  */
 export async function resetDatabase(): Promise<void> {
+  await resetMediaStorage()
   await env.DB.batch(VOLATILE_TABLES.map((table) => env.DB.prepare(`DELETE FROM ${table}`)))
+}
+
+export async function rawApi(method: string, path: string, options: {
+  body?: Uint8Array; cookie?: string | null; headers?: Record<string, string>
+} = {}): Promise<Response> {
+  const headers = new Headers(options.headers)
+  if (options.cookie) headers.set('cookie', options.cookie)
+  return app.request(`http://localhost${path}`, { method, headers, body: options.body }, env)
+}
+
+export async function resetMediaStorage(): Promise<void> {
+  for (const bucket of [env.PUBLIC_BUCKET, env.PRIVATE_BUCKET]) {
+    let cursor: string | undefined
+    do {
+      const page = await bucket.list({ cursor })
+      if (page.objects.length) await bucket.delete(page.objects.map(object => object.key))
+      cursor = page.truncated ? page.cursor : undefined
+    } while (cursor)
+  }
 }
 

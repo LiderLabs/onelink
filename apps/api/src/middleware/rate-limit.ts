@@ -119,6 +119,8 @@ export interface RateLimitOptions {
   /** Swap in a different implementation (e.g. a Durable Object) for a route. */
   limiter?: RateLimiter
   cost?: number
+  /** Media uploads refuse a depleted throttle budget with a retry hint. */
+  rejectThrottle?: boolean
 }
 
 export const rateLimit = (ruleKey: string, options: RateLimitOptions = {}) =>
@@ -137,7 +139,7 @@ export const rateLimit = (ruleKey: string, options: RateLimitOptions = {}) =>
     c.header('x-ratelimit-remaining', String(decision.remaining))
     c.header('x-ratelimit-reset', String(Math.ceil(decision.resetAt / 1000)))
 
-    if (!decision.allowed && rule.action === 'block') {
+    if (!decision.allowed && (rule.action === 'block' || (rule.action === 'throttle' && options.rejectThrottle))) {
       const retryAfter = Math.max(1, Math.ceil((decision.resetAt - now()) / 1000))
       throw rateLimited(`Too many requests. Try again in ${retryAfter}s.`, retryAfter)
     }
