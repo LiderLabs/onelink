@@ -100,6 +100,17 @@ interface ErrorEnvelope {
   error?: { code?: string; message?: string; details?: unknown }
 }
 
+export function apiErrorFromResponse(status: number, headers: Headers, payload: unknown): ApiError {
+  const envelope = (payload ?? {}) as ErrorEnvelope
+  const rawRetry = headers.get('retry-after')
+  const retryAfter = rawRetry === null ? null : Number(rawRetry)
+  return new ApiError(status, (envelope.error?.code as ApiErrorCode | undefined) ?? 'UNKNOWN',
+    envelope.error?.message ?? 'The request could not be completed.', {
+      details: envelope.error?.details,
+      retryAfterSeconds: retryAfter !== null && Number.isFinite(retryAfter) ? retryAfter : null,
+    })
+}
+
 /**
  * One field-level problem from a `422 VALIDATION_ERROR`.
  *
@@ -186,17 +197,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   }
 
   if (!response.ok) {
-    const envelope = (payload ?? {}) as ErrorEnvelope
-    const retryAfter = Number(response.headers.get('retry-after'))
-    throw new ApiError(
-      response.status,
-      (envelope.error?.code as ApiErrorCode | undefined) ?? 'UNKNOWN',
-      envelope.error?.message ?? 'The request could not be completed.',
-      {
-        details: envelope.error?.details,
-        retryAfterSeconds: Number.isFinite(retryAfter) ? retryAfter : null,
-      },
-    )
+    throw apiErrorFromResponse(response.status, response.headers, payload)
   }
 
   if (payload === null) {

@@ -1,5 +1,35 @@
 /* Profile uses the auth edition's type and surfaces, with controls scoped to
    the editor so recovery screens and other console routes keep their styling. */
+.photo-crop-dialog {
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 0;
+  border: 1px solid #e6e6e2;
+  border-radius: 1.2rem;
+  background: #fff;
+  color: #252525;
+  overflow-y: auto;
+}
+.photo-crop-dialog::backdrop { background: rgb(20 20 20 / .42); }
+.photo-crop-content { padding: 1.5rem; }
+.photo-crop-content h2 { margin: .35rem 0 .6rem; font-family: var(--font-display); font-size: 1.8rem; }
+.photo-crop-content > p:not(.profile-kicker) { font-size: .8rem; line-height: 1.6; color: #707070; }
+.photo-crop-frame { position: relative; width: min(100%, 20rem, 42dvh); aspect-ratio: 1; margin: 1.25rem auto; background: #eee; }
+.photo-crop-frame canvas { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+.photo-crop-frame canvas:active { cursor: grabbing; }
+.photo-crop-frame canvas:focus-visible { outline: 3px solid #252525; outline-offset: 4px; }
+.photo-crop-grid { position: absolute; inset: 0; pointer-events: none; border: 1px solid rgb(255 255 255 / .7); background: linear-gradient(to right, transparent 33%, rgb(255 255 255 / .35) 33%, rgb(255 255 255 / .35) calc(33% + 1px), transparent calc(33% + 1px), transparent 66%, rgb(255 255 255 / .35) 66%, rgb(255 255 255 / .35) calc(66% + 1px), transparent calc(66% + 1px)), linear-gradient(to bottom, transparent 33%, rgb(255 255 255 / .35) 33%, rgb(255 255 255 / .35) calc(33% + 1px), transparent calc(33% + 1px), transparent 66%, rgb(255 255 255 / .35) 66%, rgb(255 255 255 / .35) calc(66% + 1px), transparent calc(66% + 1px)); }
+.photo-crop-zoom { display: flex; align-items: center; gap: .9rem; font-size: .8rem; }
+.photo-crop-zoom input { flex: 1; min-width: 0; accent-color: #252525; }
+.photo-crop-zoom span { width: 2.5rem; text-align: right; color: #707070; }
+.photo-crop-actions { margin-top: 1.25rem; display: flex; align-items: center; justify-content: flex-end; gap: .6rem; flex-wrap: wrap; }
+.photo-crop-actions button { font-family: var(--font-sans); text-transform: none; letter-spacing: 0; border-radius: .55rem; font-size: .8rem; }
+.photo-crop-actions .photo-reset { margin-right: auto; color: #707070; cursor: pointer; }
+.photo-crop-actions button:focus-visible { outline: 2px solid #252525; outline-offset: 3px; }
+.photo-error { color: #c1121f !important; font-size: .8rem; line-height: 1.6; }
+.photo-upload-status { margin-top: .8rem; font-size: .8rem; }
+.photo-upload-status progress { width: 100%; height: .35rem; accent-color: #252525; }
 .profile-shell {
   min-height: 100dvh;
   background: #fff;
