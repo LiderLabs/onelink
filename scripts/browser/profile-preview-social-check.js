@@ -1,7 +1,7 @@
 async page => {
   await page.unrouteAll({behavior:'ignoreErrors'});await page.reload();
   const check=(condition,message)=>{if(!condition)throw new Error(message)};
-  const socials=page.getByRole('tab',{name:'Socials',exact:true});await socials.click();
+  const socials=page.getByRole('navigation',{name:'Account pages',exact:true}).getByRole('link',{name:'Socials',exact:true});await socials.click();
   const preview=page.getByRole('region',{name:'Live profile preview',exact:true});await preview.waitFor();
   const ids=[];
   try {

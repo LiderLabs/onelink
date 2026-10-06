@@ -134,9 +134,10 @@ uploads a 512 × 512 WebP capped at 240 KiB. Cancel sends no upload. Replacement
 and confirmed removal clean up the previous photo. Unsaved profile text survives
 photo operations. Failed file cleanup has a separate retry control.
 
-The profile page has two tabs. **Profile** contains the photo, profile details,
-security, and session details. **Socials** contains social links and the live
-preview. Switching tabs preserves unsaved drafts.
+The top navbar links to **Profile** (`/app/profile`) for the photo, profile
+details, security, and session details, and **Socials** (`/app/socials`) for social
+links and the live preview. The account avatar and username sit at the top right.
+Switching between these pages preserves unsaved drafts.
 
 The editor's live profile preview follows unsaved name, username, bio,
 location/pronouns, photo crop, and social-link drafts. Hidden socials are omitted;
@@ -163,7 +164,7 @@ npx @playwright/cli run-code --filename=scripts/browser/profile-photo-state-chec
 npx @playwright/cli run-code --filename=scripts/browser/profile-photo-response-check.js
 npx @playwright/cli run-code --filename=scripts/browser/profile-preview-check.js
 npx @playwright/cli run-code --filename=scripts/browser/profile-preview-social-check.js
-npx @playwright/cli run-code --filename=scripts/browser/profile-tabs-check.js
+npx @playwright/cli run-code --filename=scripts/browser/profile-navigation-check.js
 ```
 
 The flow check creates a disposable local account used by the UI check.

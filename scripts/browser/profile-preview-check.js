@@ -4,7 +4,8 @@ async page => {
   const check=(condition,message)=>{if(!condition)throw new Error(message)};
   const preview=page.getByRole('region',{name:'Live profile preview',exact:true,includeHidden:true});
   await preview.waitFor({state:'attached',timeout:5000});
-  const profile=page.getByRole('tab',{name:'Profile',exact:true}),socials=page.getByRole('tab',{name:'Socials',exact:true});
+  const nav=page.getByRole('navigation',{name:'Account pages',exact:true});
+  const profile=nav.getByRole('link',{name:'Profile',exact:true}),socials=nav.getByRole('link',{name:'Socials',exact:true});
   const original=await page.evaluate(async()=>(await(await fetch('/api/v1/auth/me')).json()).data.user);
   let writes=0;const count=req=>{if(['POST','PATCH','PUT','DELETE'].includes(req.method())&&req.url().includes('/api/v1/'))writes++};page.on('request',count);
   try {

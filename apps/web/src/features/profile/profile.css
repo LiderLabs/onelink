@@ -91,6 +91,12 @@
   cursor: pointer;
 }
 
+.profile-top-nav { display: flex; gap: 1.5rem; }
+.profile-top-nav a[aria-disabled=true] { opacity: .55; cursor: wait; }
+.profile-session-account { display: flex; align-items: center; gap: .65rem; min-width: 0; }
+.profile-session .profile-nav-avatar { width: 2.25rem; height: 2.25rem; border-radius: .65rem; font-size: .9rem; }
+.profile-nav-username { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #707070; }
+
 .console-top-nav a {
   border-left: 0;
   border-bottom: 2px solid transparent;
@@ -177,12 +183,6 @@
 }
 
 .profile-tab-panel[hidden] { display: none; }
-.profile-page-nav { border-bottom: 1px solid #e3e3df; margin-bottom: 2rem; }
-.profile-page-nav [role=tablist] { display: flex; gap: 2rem; }
-.profile-page-nav [role=tab] { padding: .9rem 0; margin-bottom: -1px; border-bottom: 2px solid transparent; color: #888; font-size: .85rem; cursor: pointer; }
-.profile-page-nav [role=tab][aria-selected=true] { border-color: #252525; color: #252525; }
-.profile-page-nav [role=tab]:focus-visible { outline: 2px solid #252525; outline-offset: 5px; }
-.profile-page-nav [role=tab]:disabled { cursor: wait; opacity: .55; }
 
 .profile-editors {
   min-width: 0;
@@ -559,8 +559,12 @@
 @media (max-width: 720px) {
   .profile-masthead-inner {
     min-height: 5rem;
+    flex-wrap: wrap;
+    padding-block: 1rem;
+    gap: 1rem;
   }
   .profile-brand-nav {
+    flex-wrap: wrap;
     gap: 1.25rem;
   }
   .profile-masthead .auth-brand {
@@ -571,6 +575,7 @@
   }
   .profile-session {
     font-size: .7rem;
+    margin-left: auto;
   }
   .profile-main {
     padding-top: 2.25rem;

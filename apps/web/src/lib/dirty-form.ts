@@ -106,8 +106,9 @@ export interface UnsavedChangesGuard {
  * removed the moment the form is clean, because a page with nothing to lose
  * should close without a prompt.
  */
-export function useUnsavedChanges(dirty: boolean): UnsavedChangesGuard {
-  const blocker = useBlocker(dirty)
+export function useUnsavedChanges(dirty: boolean, preservedPaths: readonly string[] = []): UnsavedChangesGuard {
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty &&
+    !(preservedPaths.includes(currentLocation.pathname) && preservedPaths.includes(nextLocation.pathname)))
 
   useEffect(() => {
     if (!dirty) return

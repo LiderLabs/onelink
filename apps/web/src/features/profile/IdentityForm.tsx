@@ -145,7 +145,8 @@ export function IdentityForm({ user, disabled, navigationLocked, onPreviewChange
 
   const baseline = useMemo(() => baselineOf(user), [user])
   const form = useDirtyForm<IdentityDraft>(baseline)
-  const guard = useUnsavedChanges((form.dirty && !disabled) || navigationLocked)
+  const guard = useUnsavedChanges((form.dirty && !disabled) || navigationLocked,
+    navigationLocked ? [] : ['/app/profile', '/app/socials'])
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [banner, setBanner] = useState<string | null>(null)

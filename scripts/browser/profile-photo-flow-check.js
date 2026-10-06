@@ -9,7 +9,7 @@ async page => {
     if(!response.ok)throw new Error('Local fixture registration failed: '+response.status);
     return {username};
   });
-  await page.goto(`${origin}/app/profile`);await page.getByRole('heading',{name:'Photo test',exact:true,level:1}).waitFor();
+  await page.goto(`${origin}/app/profile`);await page.getByRole('heading',{name:'Your profile',exact:true,level:1}).waitFor({state:'attached'});
   const check=(condition,message)=>{if(!condition)throw new Error(message)};
   check(await page.getByRole('heading',{name:'Profile photo',exact:true}).count()===1,'profile photo editor is present');
   const dialog=page.getByRole('dialog',{name:'Crop your photo'});

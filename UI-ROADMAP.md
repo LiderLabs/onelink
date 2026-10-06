@@ -83,9 +83,10 @@ new UI owner should do — they are cheap, and they are what would promote U0/U1
 **Profile live preview is implemented.** The existing `/app/profile` editor now
 previews unsaved identity, photo crops, social-link edits/additions, visibility,
 and order. Save remains explicit; cancel/undo restores saved values. This is the
-client-side profile preview. Local **Profile** and **Socials** tabs separate
-photo/details, security, and session information from social links and preview;
-switching tabs preserves drafts. U9's server-driven page preview, sharing, and QR
+client-side profile preview. Top navbar links to **Profile** (`/app/profile`)
+and **Socials** (`/app/socials`) separate photo/details, security, and session
+information from social links and preview. The avatar and username appear at the
+top right; switching pages preserves drafts. U9's server-driven page preview, sharing, and QR
 tools below remain separate work.
 
 | Phase | Produces | Needs | Can start |
