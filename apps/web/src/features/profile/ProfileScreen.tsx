@@ -1,4 +1,4 @@
-import { stagger } from '../../lib/css'
+import { useEffect } from 'react'
 import { useSession } from '../../lib/session'
 import { Notice } from '../../components/Notice'
 import { Splash } from '../../components/StatusScreens'
@@ -6,133 +6,83 @@ import { AccountRecord } from './AccountRecord'
 import { ChangePasswordForm } from './ChangePasswordForm'
 import { IdentityForm } from './IdentityForm'
 import { SocialsEditor } from './SocialsEditor'
+import './profile.css'
 
-// ============================================================================
-// `/app/profile` — identity, social links, security and the account record
-// (spec §5).
-//
-// This screen is a composition, and the reason is the three session states that
-// are not "normal". They are not edge cases to bolt on later; each one changes
-// what may be ASKED FOR, so the decision belongs above the sections rather than
-// inside them:
-//
-//   impersonated      reads identity and socials, writes neither, and says so
-//                     prominently — the point of a support session is to see,
-//                     not to become
-//   forced rotation   the API's interlock closes everything except the password
-//                     form, which is exactly why the form stays reachable
-//   suspended/banned  `/auth/me` still answers (that is what lets this screen
-//                     explain itself), every write and `/profile/socials` are
-//                     refused outright, so that request is never made
-//
-// The capability list decides none of this: it describes staff permissions, and
-// the server is the authority on what this session may do (ground rule 4).
-// ============================================================================
-
+// Keep each section's existing resource and session guards together while
+// composing the editor and the account summary into one responsive screen.
 export function ProfileScreen() {
   const session = useSession()
   const user = session.user
+  useEffect(() => {
+    const previous = document.title
+    document.title = `Your profile · ${session.platformName}`
+    return () => { document.title = previous }
+  }, [session.platformName])
 
-  // `RequireAuth` has already established that there is a user; this covers the
-  // single render between a session ending and the redirect taking over.
   if (!user) return <Splash label="Loading your account" />
 
   const forced = session.mustChangePassword
   const impersonated = user.impersonatedBy !== null
   const usable = user.status === 'active'
-
-  // The exact preconditions `GET /profile/socials` enforces on the server.
   const readable = usable && !forced
-
-  const blockedReason = !usable ? (
-    <>
-      Nothing is loaded here because the API refuses this endpoint for a{' '}
-      <span className="font-mono text-xs">{user.status}</span> account rather than answering it.
-      That is a policy, not a fault — the notice above says what happened to the account.
-    </>
-  ) : (
-    <>
-      A password change is outstanding, and the API closes every endpoint except this screen's
-      security form until it is done. Set a new password below and the links appear.
-    </>
-  )
+  const initials = user.displayName.trim().split(/\s+/).slice(0, 2)
+    .map(word => Array.from(word)[0]).join('').toUpperCase() || '@'
+  const blockedReason = !usable
+    ? 'Social links are unavailable while your account is restricted.'
+    : 'Change your temporary password in the security section to access your social links.'
 
   return (
-    <div className="space-y-12">
-      <header>
-        <p className="eyebrow reveal" style={stagger(0)}>
-          Profile
-        </p>
-        <h1
-          className="reveal mt-3 font-display text-4xl font-medium leading-tight tracking-[-0.02em] sm:text-5xl"
-          style={stagger(1)}
-        >
-          {user.displayName}
-        </h1>
-        <p className="reveal mt-4 max-w-xl leading-relaxed text-ink-soft" style={stagger(2)}>
-          Your identity, your links, and the record behind them. There is no background refresh to
-          wait for: a save is sent and confirmed while you watch.
-        </p>
+    <div className="profile-screen">
+      <header className="profile-heading">
+        <div className="profile-person">
+          <span className="profile-monogram" aria-hidden="true">{initials}</span>
+          <div className="profile-heading-text">
+            <p className="profile-kicker">Your profile</p>
+            <h1>{user.displayName}</h1>
+            <p className="profile-handle">@{user.username}</p>
+          </div>
+        </div>
+        <p className="profile-heading-copy">The details that make<br className="hidden sm:block" /> this space yours.</p>
       </header>
 
-      {impersonated ? (
-        <Notice tone="warning" label="Read-only · impersonated session" delay={2}>
-          An administrator is acting as this account. Identity and links are readable here so
-          support can see what you see, and every write on this screen is refused by the API — so
-          the forms below are read-only on purpose.
-        </Notice>
-      ) : null}
+      {impersonated ? <Notice tone="warning" label="Read-only support session">
+        You are viewing this account as an administrator. Profile details and social links are read-only.
+      </Notice> : null}
+      {forced ? <Notice tone="warning" label="Password change required">
+        Set a new password in the security section below to finish setting up your account. This browser will stay signed in.
+      </Notice> : null}
+      {!usable ? <Notice tone="error" label={`Account ${user.status}`}>
+        Your account is restricted. You can view your account details here, but changes are unavailable.
+      </Notice> : null}
 
-      {forced ? (
-        <Notice tone="warning" label="Password change required" delay={2}>
-          An owner (or a password reset) marked this password as temporary. Every other endpoint
-          answers <span className="font-mono text-xs">403 MUST_CHANGE_PASSWORD</span> until it is
-          replaced — including the links below. Setting a new one unblocks the account without
-          signing you out of this browser.
-        </Notice>
-      ) : null}
-
-      {!usable ? (
-        <Notice tone="error" label={`Account ${user.status}`} delay={2}>
-          The API still answers <span className="font-mono text-xs">GET /auth/me</span> for this
-          account, which is what lets this screen explain itself — and refuses everything else. The
-          forms below are closed, not broken.
-        </Notice>
-      ) : null}
-
-      <IdentityForm user={user} disabled={!usable || forced || impersonated} />
-
-      <SocialsEditor
-        readable={readable}
-        writable={readable && !impersonated}
-        blockedReason={blockedReason}
-      />
-
-      <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:gap-14">
-        <AccountRecord user={user} capabilities={session.capabilities} />
-
-        <section className="plate h-fit p-6" aria-labelledby="security">
-          <h2 id="security" className="eyebrow">
-            Security
-          </h2>
-          <p className="mb-6 mt-3 text-sm leading-relaxed text-ink-soft">
-            Changing this signs your other sessions out. This browser stays signed in, so nobody is
-            thrown out mid-task.
-          </p>
-          <ChangePasswordForm forced={forced} />
-        </section>
+      <div className="profile-content">
+        <div className="profile-editors">
+          <IdentityForm user={user} disabled={!usable || forced || impersonated} />
+          <SocialsEditor readable={readable} writable={readable && !impersonated} blockedReason={blockedReason} />
+          <section className="profile-section profile-security" aria-labelledby="security">
+            <div className="profile-section-heading">
+              <div>
+                <p className="profile-section-number" aria-hidden="true">03</p>
+                <h2 id="security">Security</h2>
+              </div>
+              <span className="profile-section-note">Keep your account yours</span>
+            </div>
+            <p className="profile-section-description">
+              Update your password here. Your other sessions will be signed out; this browser stays signed in.
+            </p>
+            <ChangePasswordForm forced={forced} />
+          </section>
+        </div>
+        <aside className="profile-summary" aria-label="Your account">
+          <AccountRecord user={user} capabilities={session.capabilities} />
+          <nav className="profile-jump-nav" aria-label="Profile sections">
+            <p>On this page</p>
+            <a href="#identity">Profile details <span aria-hidden="true">↗</span></a>
+            <a href="#socials">Social links <span aria-hidden="true">↗</span></a>
+            <a href="#security">Security <span aria-hidden="true">↗</span></a>
+          </nav>
+        </aside>
       </div>
-
-      <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-rule pt-6">
-        <p className="eyebrow">Signed in as {user.username}</p>
-        <button
-          type="button"
-          onClick={() => void session.logout()}
-          className="border-b border-transparent font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-ink-soft transition-colors hover:border-ink hover:text-ink"
-        >
-          Sign out
-        </button>
-      </footer>
     </div>
   )
 }

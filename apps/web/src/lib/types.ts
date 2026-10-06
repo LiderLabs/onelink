@@ -101,7 +101,7 @@ export interface RoleDescriptor {
 /** GET /public/settings — the unauthenticated bootstrap surface. */
 export interface PublicSettings {
   platformName: string
-  settings: Record<string, string>
+  settings: Record<string, unknown>
   roles: RoleDescriptor[]
 }
 

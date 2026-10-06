@@ -219,20 +219,22 @@ export function IdentityForm({ user, disabled }: IdentityFormProps) {
   }
 
   return (
-    <section aria-labelledby="identity">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 id="identity" className="eyebrow">
-          Identity
-        </h2>
+    <section aria-labelledby="identity" className="profile-section profile-identity">
+      <div className="profile-section-heading">
+        <div>
+          <p className="profile-section-number" aria-hidden="true">01</p>
+          <h2 id="identity">Profile details</h2>
+        </div>
         {/* A live summary rather than a silent disabled button: the reader can
             always tell whether there is anything left to send. */}
-        <p className="eyebrow" aria-live="polite">
-          {saved && !form.dirty ? 'Saved' : form.dirty ? 'Unsaved changes' : 'No unsaved changes'}
+        <p className={`profile-save-status${form.dirty ? ' is-dirty' : ''}`} aria-live="polite">
+          <span aria-hidden="true">{form.dirty ? '●' : '✓'}</span>{' '}
+          {saved && !form.dirty ? 'Changes saved' : form.dirty ? 'Unsaved changes' : 'Up to date'}
         </p>
       </div>
 
-      <p className="mt-3 max-w-prose text-sm leading-relaxed text-ink-soft">
-        What people see when they find you. Only the fields you change are sent.
+      <p className="profile-section-description">
+        Introduce yourself. These details help people get to know you.
       </p>
 
       {banner ? (
@@ -243,8 +245,7 @@ export function IdentityForm({ user, disabled }: IdentityFormProps) {
 
       {saved ? (
         <Notice tone="success" label="Identity saved" delay={1} className="mt-5">
-          Stored as the server normalized it — the masthead and the account record below already
-          read the new values.
+          Your profile details are up to date.
         </Notice>
       ) : null}
 
@@ -258,7 +259,7 @@ export function IdentityForm({ user, disabled }: IdentityFormProps) {
             delay={1}
             maxLength={DISPLAY_NAME_MAX}
             disabled={disabled}
-            hint={`Up to ${DISPLAY_NAME_MAX} characters. Cannot be empty.`}
+            hint="The name people will see."
             error={fieldErrors.displayName ?? null}
             value={values.displayName}
             onChange={field('displayName')}
@@ -286,7 +287,7 @@ export function IdentityForm({ user, disabled }: IdentityFormProps) {
               delay={3}
               maxLength={BIO_MAX}
               disabled={disabled}
-              hint={`Up to ${BIO_MAX} characters. Clear the box to remove it.`}
+              hint={`${values.bio.length}/${BIO_MAX} characters. A few words about you.`}
               error={fieldErrors.bio ?? null}
               value={values.bio}
               onChange={field('bio')}
@@ -325,7 +326,7 @@ export function IdentityForm({ user, disabled }: IdentityFormProps) {
             pendingLabel="Saving"
             disabled={disabled || !form.dirty}
           >
-            Save identity
+            Save changes
           </Button>
 
           {form.dirty && !disabled ? (

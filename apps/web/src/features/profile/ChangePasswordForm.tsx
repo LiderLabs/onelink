@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { errorMessageFor } from '../../lib/api'
 import { useSession } from '../../lib/session'
 import { Button } from '../../components/Button'
-import { Field } from '../../components/Field'
+import { AuthField } from '../../components/AuthField'
 import { Notice } from '../../components/Notice'
 
 // ============================================================================
@@ -83,39 +83,36 @@ export function ChangePasswordForm({ forced }: { forced: boolean }) {
         </Notice>
       ) : null}
 
-      <Field
+      <AuthField
         label="Current password"
         name="currentPassword"
         type="password"
         autoComplete="current-password"
         required
-        delay={1}
-        error={fieldErrors.current ?? null}
+        error={fieldErrors.current}
         value={currentPassword}
         onChange={(event) => setCurrentPassword(event.target.value)}
       />
 
-      <Field
+      <AuthField
         label="New password"
         name="newPassword"
         type="password"
         autoComplete="new-password"
         required
-        delay={2}
         hint={`At least ${MIN_PASSWORD_LENGTH} characters, and different from the old one.`}
-        error={fieldErrors.next ?? null}
+        error={fieldErrors.next}
         value={newPassword}
         onChange={(event) => setNewPassword(event.target.value)}
       />
 
-      <Field
+      <AuthField
         label="Confirm new password"
         name="confirmPassword"
         type="password"
         autoComplete="new-password"
         required
-        delay={3}
-        error={fieldErrors.confirm ?? null}
+        error={fieldErrors.confirm}
         value={confirmPassword}
         onChange={(event) => setConfirmPassword(event.target.value)}
       />
