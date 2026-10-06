@@ -157,7 +157,7 @@ export function SocialsEditor({ readable, writable, blockedReason }: SocialsEdit
     <section aria-labelledby="socials" className="profile-section profile-socials">
       <div className="profile-section-heading">
         <div>
-          <p className="profile-section-number" aria-hidden="true">02</p>
+          <p className="profile-section-number" aria-hidden="true">03</p>
           <h2 id="socials">Social links</h2>
         </div>
         {readable ? (

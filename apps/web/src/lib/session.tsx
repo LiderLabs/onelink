@@ -40,6 +40,8 @@ export interface RegisterInput {
 export interface SessionContextValue extends SessionState {
   /** Re-reads the session. Used by guards, after login, and by retry screens. */
   refresh: () => Promise<void>
+  /** Refresh profile/session without turning a transient read failure into a route unmount. */
+  refreshProfile: () => Promise<SessionUser>
   login: (identifier: string, password: string) => Promise<SessionUser>
   register: (input: RegisterInput) => Promise<SessionUser>
   logout: () => Promise<void>
@@ -244,10 +246,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [runAuthenticated],
   )
 
+  const refreshProfile = useCallback(async (): Promise<SessionUser> => {
+    const result = await runAuthenticated(() => api.me())
+    setState(previous => ({ ...previous, status: 'authenticated', user: result.user,
+      capabilities: result.capabilities, platformName: result.platformName, bootstrapError: null }))
+    return result.user
+  }, [runAuthenticated])
+
   const value = useMemo<SessionContextValue>(
     () => ({
       ...state,
       refresh: load,
+      refreshProfile,
       login,
       register,
       logout,
@@ -256,7 +266,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       can: (capability: string) => state.capabilities.includes(capability),
       mustChangePassword: state.user?.requirePasswordChange === true,
     }),
-    [state, load, login, register, logout, changePassword, updateProfile],
+    [state, load, refreshProfile, login, register, logout, changePassword, updateProfile],
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

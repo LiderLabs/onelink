@@ -30,6 +30,18 @@
 .photo-error { color: #c1121f !important; font-size: .8rem; line-height: 1.6; }
 .photo-upload-status { margin-top: .8rem; font-size: .8rem; }
 .photo-upload-status progress { width: 100%; height: .35rem; accent-color: #252525; }
+.profile-avatar { overflow: hidden; }
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.profile-photo-controls { display: flex; align-items: center; gap: 1.5rem; }
+.profile-photo-avatar { width: 6rem; height: 6rem; border-radius: 1.35rem; }
+.profile-photo-controls .profile-section-description { margin-top: 0; margin-bottom: .8rem; }
+.profile-photo-buttons { display: flex; gap: 1.1rem; align-items: center; flex-wrap: wrap; }
+.profile-photo-buttons > button:last-child:not(:first-child) { color: #707070; font-size: .8rem; cursor: pointer; }
+.profile-photo-help { margin-top: .65rem; font-size: .7rem; color: #858585; }
+.profile-photo-message, .profile-photo-cleanup { margin-top: 1rem; font-size: .8rem; line-height: 1.6; }
+.profile-photo-message button, .profile-photo-cleanup button { margin-top: .4rem; text-decoration: underline; text-underline-offset: .2em; cursor: pointer; }
+.profile-photo-cleanup { color: #707070; }
+@media (max-width: 420px) { .profile-photo-controls { align-items: flex-start; gap: 1rem; } .profile-photo-avatar { width: 4rem; height: 4rem; border-radius: .9rem; } }
 .profile-shell {
   min-height: 100dvh;
   background: #fff;

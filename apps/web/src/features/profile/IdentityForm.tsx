@@ -134,14 +134,15 @@ export interface IdentityFormProps {
   user: SessionUser
   /** A session that may read but not write: impersonated, forced rotation, suspended. */
   disabled: boolean
+  navigationLocked: boolean
 }
 
-export function IdentityForm({ user, disabled }: IdentityFormProps) {
+export function IdentityForm({ user, disabled, navigationLocked }: IdentityFormProps) {
   const session = useSession()
 
   const baseline = useMemo(() => baselineOf(user), [user])
   const form = useDirtyForm<IdentityDraft>(baseline)
-  const guard = useUnsavedChanges(form.dirty && !disabled)
+  const guard = useUnsavedChanges((form.dirty && !disabled) || navigationLocked)
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [banner, setBanner] = useState<string | null>(null)
@@ -222,7 +223,7 @@ export function IdentityForm({ user, disabled }: IdentityFormProps) {
     <section aria-labelledby="identity" className="profile-section profile-identity">
       <div className="profile-section-heading">
         <div>
-          <p className="profile-section-number" aria-hidden="true">01</p>
+          <p className="profile-section-number" aria-hidden="true">02</p>
           <h2 id="identity">Profile details</h2>
         </div>
         {/* A live summary rather than a silent disabled button: the reader can
@@ -348,6 +349,7 @@ export function IdentityForm({ user, disabled }: IdentityFormProps) {
 
       <ConfirmDialog
         open={guard.blocked}
+        pending={navigationLocked}
         title="Leave with unsaved identity changes?"
         confirmLabel="Discard and leave"
         cancelLabel="Keep editing"

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useSession } from '../../lib/session'
 import { Notice } from '../../components/Notice'
 import { Splash } from '../../components/StatusScreens'
@@ -6,6 +6,8 @@ import { AccountRecord } from './AccountRecord'
 import { ChangePasswordForm } from './ChangePasswordForm'
 import { IdentityForm } from './IdentityForm'
 import { SocialsEditor } from './SocialsEditor'
+import { ProfilePhotoEditor } from './ProfilePhotoEditor'
+import { ProfileAvatar } from './ProfileAvatar'
 import './profile.css'
 
 // Keep each section's existing resource and session guards together while
@@ -13,6 +15,7 @@ import './profile.css'
 export function ProfileScreen() {
   const session = useSession()
   const user = session.user
+  const [photoBusy, setPhotoBusy] = useState(false)
   useEffect(() => {
     const previous = document.title
     document.title = `Your profile · ${session.platformName}`
@@ -25,8 +28,6 @@ export function ProfileScreen() {
   const impersonated = user.impersonatedBy !== null
   const usable = user.status === 'active'
   const readable = usable && !forced
-  const initials = user.displayName.trim().split(/\s+/).slice(0, 2)
-    .map(word => Array.from(word)[0]).join('').toUpperCase() || '@'
   const blockedReason = !usable
     ? 'Social links are unavailable while your account is restricted.'
     : 'Change your temporary password in the security section to access your social links.'
@@ -35,7 +36,7 @@ export function ProfileScreen() {
     <div className="profile-screen">
       <header className="profile-heading">
         <div className="profile-person">
-          <span className="profile-monogram" aria-hidden="true">{initials}</span>
+          <ProfileAvatar avatarKey={user.avatarKey} displayName={user.displayName} />
           <div className="profile-heading-text">
             <p className="profile-kicker">Your profile</p>
             <h1>{user.displayName}</h1>
@@ -57,12 +58,13 @@ export function ProfileScreen() {
 
       <div className="profile-content">
         <div className="profile-editors">
-          <IdentityForm user={user} disabled={!usable || forced || impersonated} />
+          <ProfilePhotoEditor user={user} readable={readable} writable={readable && !impersonated} onBusyChange={setPhotoBusy} />
+          <IdentityForm user={user} disabled={!usable || forced || impersonated} navigationLocked={photoBusy} />
           <SocialsEditor readable={readable} writable={readable && !impersonated} blockedReason={blockedReason} />
           <section className="profile-section profile-security" aria-labelledby="security">
             <div className="profile-section-heading">
               <div>
-                <p className="profile-section-number" aria-hidden="true">03</p>
+                <p className="profile-section-number" aria-hidden="true">04</p>
                 <h2 id="security">Security</h2>
               </div>
               <span className="profile-section-note">Keep your account yours</span>
@@ -77,6 +79,7 @@ export function ProfileScreen() {
           <AccountRecord user={user} capabilities={session.capabilities} />
           <nav className="profile-jump-nav" aria-label="Profile sections">
             <p>On this page</p>
+            <a href="#photo">Profile photo <span aria-hidden="true">↗</span></a>
             <a href="#identity">Profile details <span aria-hidden="true">↗</span></a>
             <a href="#socials">Social links <span aria-hidden="true">↗</span></a>
             <a href="#security">Security <span aria-hidden="true">↗</span></a>
