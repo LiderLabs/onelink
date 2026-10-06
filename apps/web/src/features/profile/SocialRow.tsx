@@ -102,7 +102,7 @@ export function SocialRow({
 
   if (editing) {
     return (
-      <li className="border-b border-rule py-5">
+      <li className="profile-social-row is-editing border-b border-rule py-5">
         <form onSubmit={(event) => void onSave(event)} noValidate className="space-y-5">
           {error ? (
             <Notice tone="error" label="Could not save">
@@ -134,7 +134,7 @@ export function SocialRow({
           </div>
 
           <CheckboxField
-            label="Visible"
+            label="Show on my page"
             checked={isVisible}
             disabled={pending}
             hint="A hidden link stays in this list but is left out of the published page."
@@ -161,14 +161,14 @@ export function SocialRow({
   }
 
   return (
-    <li className="border-b border-rule py-4">
+    <li className="profile-social-row border-b border-rule py-4">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
           <p className="eyebrow">
             {label}
             <span className="ml-2 text-ink-faint">#{index + 1}</span>
             {social.isVisible ? null : (
-              <span className="ml-2 text-ink-soft">· hidden from the page</span>
+              <span className="profile-social-visibility">Hidden</span>
             )}
           </p>
           {/* Shown as the stored address, not as a prettified handle: this is the

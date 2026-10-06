@@ -45,7 +45,10 @@ function Links({ className }: { className?: string }) {
   )
 }
 
-export function ConsoleNav() {
+export function ConsoleNav({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    return <nav aria-label="Console" className="console-top-nav"><Links /></nav>
+  }
   return (
     <nav aria-label="Console" className="lg:sticky lg:top-12">
       <details className="lg:hidden">

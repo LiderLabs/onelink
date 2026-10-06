@@ -1,7 +1,7 @@
 # Profile photo editor
 
 Date: 2026-10-06
-Status: Written spec awaiting user review
+Status: Approved by the user on 2026-10-06
 Baseline: `585dcbd`, plus the user's accepted auth and profile redesigns in the working tree
 
 ## Intent and scope
