@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Button } from './Button'
 
@@ -42,6 +42,7 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const ref = useRef<HTMLDialogElement>(null)
+  const titleId = useId()
 
   useEffect(() => {
     const dialog = ref.current
@@ -53,7 +54,7 @@ export function ConfirmDialog({
   return (
     <dialog
       ref={ref}
-      aria-labelledby="confirm-dialog-title"
+      aria-labelledby={titleId}
       // Escape fires `cancel`; preventing the default keeps the dialog up while
       // a write is in flight, so the request cannot be abandoned mid-air.
       onCancel={(event) => {
@@ -66,7 +67,7 @@ export function ConfirmDialog({
         <p className={tone === 'danger' ? 'eyebrow text-danger' : 'eyebrow'}>
           {tone === 'danger' ? 'This cannot be undone' : 'Confirm'}
         </p>
-        <h2 id="confirm-dialog-title" className="mt-2 font-display text-2xl font-medium leading-snug">
+        <h2 id={titleId} className="mt-2 font-display text-2xl font-medium leading-snug">
           {title}
         </h2>
         <div className="mt-3 text-sm leading-relaxed text-ink-soft">{children}</div>

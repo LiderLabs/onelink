@@ -1,8 +1,9 @@
 import { Link, Outlet, useMatch } from 'react-router-dom'
+import { useState } from 'react'
 import { useSession } from '../lib/session'
 import { SuspendedNotice } from './SuspendedNotice'
 import { AuthHeader } from './AuthPage'
-import { ProfileHeader } from '../features/profile/ProfileHeader'
+import { ProfileHeader, ProfileNavigationContext } from '../features/profile/ProfileHeader'
 
 // ============================================================================
 // Page chrome for every route: masthead, any blocking advisory, and the footer.
@@ -21,13 +22,17 @@ export function AppShell() {
   const loginMatch = useMatch('/login')
   const registerMatch = useMatch('/register')
   const authPage = Boolean(loginMatch || registerMatch)
-  const profilePage = Boolean(useMatch('/app/profile'))
+  const profileMatch = useMatch('/app/profile')
+  const socialsMatch = useMatch('/app/socials')
+  const profilePage = Boolean(profileMatch || socialsMatch)
+  const [photoBusy, setPhotoBusy] = useState(false)
 
   const maintenanceSetting = settings?.settings['platform.maintenance_mode']
   const maintenanceEnabled = maintenanceSetting === true || maintenanceSetting === 'true'
   const maintenanceMessage = settings?.settings['platform.maintenance_message']
 
   return (
+    <ProfileNavigationContext.Provider value={{ photoBusy, setPhotoBusy }}>
     <div className={`flex min-h-screen flex-col${authPage ? ' auth-shell' : profilePage ? ' profile-shell' : ''}`}>
       <a
         href="#main"
@@ -36,7 +41,7 @@ export function AppShell() {
         Skip to content
       </a>
 
-      {authPage ? <AuthHeader /> : profilePage ? <ProfileHeader /> : <header className="border-b border-rule">
+      {authPage ? <AuthHeader /> : profilePage ? <ProfileHeader navigationLocked={photoBusy} /> : <header className="border-b border-rule">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-end justify-between gap-x-6 gap-y-3 px-5 py-5">
           <Link to="/" className="font-display text-[1.75rem] font-medium leading-none tracking-tight">
             {platformName}
@@ -101,5 +106,6 @@ export function AppShell() {
         </div>
       </footer>}
     </div>
+    </ProfileNavigationContext.Provider>
   )
 }

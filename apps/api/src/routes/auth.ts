@@ -206,11 +206,9 @@ authRoutes.patch(
         // on the same row. `undefined` stays "not in the body" all the way down.
         location: body.location,
         pronouns: body.pronouns,
-        // R1.3: the avatar this account points at. Still one more optional key on
-        // the same body, so `undefined` keeps meaning "not in the body" and `null`
-        // keeps meaning "clear it" all the way down.
-        avatarKey: body.avatarKey,
         username: body.username,
+        avatarKey: body.avatarKey,
+        expectedAvatarKey: body.expectedAvatarKey,
       },
       c.get('auditor'),
     )

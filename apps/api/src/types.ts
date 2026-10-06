@@ -403,3 +403,12 @@ export interface AppVariables {
 // and augmented in src/env.d.ts. It is the single binding type for this project.
 export type AppEnv = { Bindings: Cloudflare.Env; Variables: AppVariables }
 
+
+export interface MediaDto {
+  id: string
+  key: string
+  url: string
+  width: number
+  height: number
+  bytes: number
+}

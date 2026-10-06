@@ -37,12 +37,12 @@ const AUDIT_COLUMNS = [
 
 const AUDIT_BIND_COUNT = 17
 
-export function auditInsertStmt(db: D1Database, entry: AuditEntry): D1PreparedStatement {
+export function auditInsertStmt(db: D1Database, entry: AuditEntry, requirePreviousChange = false): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO audit_logs (${AUDIT_COLUMNS}) VALUES (${new Array(AUDIT_BIND_COUNT)
+      `INSERT INTO audit_logs (${AUDIT_COLUMNS}) ${requirePreviousChange ? 'SELECT' : 'VALUES ('} ${new Array(AUDIT_BIND_COUNT)
         .fill('?')
-        .join(',')})`,
+        .join(',')} ${requirePreviousChange ? 'WHERE changes() = 1' : ')'}`,
     )
     .bind(
       entry.id,

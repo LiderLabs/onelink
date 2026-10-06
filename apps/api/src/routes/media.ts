@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { deleteOwnedAvatar, getCurrentAvatar, readPublicAvatar, uploadAvatar } from '../services/avatar.service'
 import { MAX_MEDIA_FILENAME_LENGTH, MEDIA_KINDS } from '../lib/constants'
 import { notFound, validationError } from '../lib/errors'
 import { noContent, ok } from '../lib/http'
@@ -53,11 +54,35 @@ export const mediaRoutes = new Hono<AppEnv>()
 
 const uploadLimit = rateLimit('media_upload_user')
 
+// Managed profile photos use separate paths, preserving the generic media API.
+mediaRoutes.post('/avatar', requireActiveAccount, requirePasswordSettled, requireUnimpersonated,
+  rateLimit('media_upload_user', { rejectThrottle: true }), async c => {
+    const query = c.req.query()
+    if (query.kind !== 'avatar' || Object.keys(query).some(key => key !== 'kind')) throw validationError('Choose a supported photo type.')
+    const bytes = new Uint8Array(await c.req.arrayBuffer())
+    return ok(c, await uploadAvatar(c.env, actorInfoOf(currentUser(c)), bytes, c.req.header('content-type') ?? '', c.get('auditor')), { status: 201 })
+  })
+mediaRoutes.get('/avatar', requireActiveAccount, requirePasswordSettled, async c =>
+  ok(c, { media: await getCurrentAvatar(c.env.DB, currentUser(c).id) }))
+mediaRoutes.delete('/avatar/:id', requireActiveAccount, requirePasswordSettled, requireUnimpersonated, async c => {
+  await deleteOwnedAvatar(c.env, actorInfoOf(currentUser(c)), c.req.param('id'), c.get('auditor'))
+  return noContent(c)
+})
+mediaRoutes.get('/files/avatars/:ownerId/:filename', async c => {
+  const object = await readPublicAvatar(c.env, `avatars/${c.req.param('ownerId')}/${c.req.param('filename')}`)
+  return c.body(object.body, 200, { 'content-type': object.httpMetadata?.contentType ?? 'image/webp', etag: object.httpEtag, 'cache-control': 'no-store' })
+})
+
 // ------------------------------------------------------------------- serve --
 
 mediaRoutes.get('/*', async (c) => {
   const key = servableKeyFrom(c.req.path)
   if (key === null) throw notFound('Media asset')
+  if (key.startsWith('avatars/')) {
+    const retired = await c.env.DB.prepare("SELECT id FROM media_assets WHERE r2_key=? AND status='deleted'")
+      .bind(key).first()
+    if (retired) throw notFound('Media asset')
+  }
 
   // `onlyIf` lets R2 answer a conditional request itself — a `304` with no body is
   // the cheap path for an object the browser already holds.

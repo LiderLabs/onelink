@@ -1,6 +1,6 @@
 # Profile Photo Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Let account holders crop, upload, replace, and remove a persistent profile photo.
 
@@ -67,7 +67,7 @@
 - Produces `mediaUrl(key: string): string`, yielding the same-origin `/api/v1/media/files/` path for a validated avatar key.
 - Fixtures export `avatarWebp(): Uint8Array` with a real decodable 512-square file and helpers for container mutations. Browser-generated fixture bytes are test data, not synthetic signatures passed off as valid images.
 
-- [ ] Write named tests asserting valid lossy/lossless/extended WebP dimensions and MIME; `240 * 1024 + 1` bytes throws status 413; wrong MIME, empty bytes, non-WebP, non-512 dimensions, animation, invalid RIFF lengths, truncated chunks, and missing image payload throw status 422. Mutate real fixtures and recompute enclosing lengths when the case requires it.
+- [x] Write named tests asserting valid lossy/lossless/extended WebP dimensions and MIME; `240 * 1024 + 1` bytes throws status 413; wrong MIME, empty bytes, non-WebP, non-512 dimensions, animation, invalid RIFF lengths, truncated chunks, and missing image payload throw status 422. Mutate real fixtures and recompute enclosing lengths when the case requires it.
 
   ```ts
   it('accepts a real 512-square WebP', () => {
@@ -81,10 +81,10 @@
       .toThrowError(expect.objectContaining({ status: 413 }))
   })
   ```
-- [ ] Run `npm.cmd run test -w @onelink/api -- test/media.validation.spec.ts`; confirm failure names the missing validator or rejected behavior.
-- [ ] Implement bounded RIFF/chunk parsing using official WebP container definitions. Reject contradictory dimensions and malformed payload headers; account for odd-chunk padding and bounds before reading. Build the relative URL without allowing key traversal.
-- [ ] Re-run the targeted command; all validation assertions pass. Run API typecheck.
-- [ ] Commit the validator and its fixtures/tests: `feat(api): validate bounded avatar WebP uploads`.
+- [x] Run `npm.cmd run test -w @onelink/api -- test/media.validation.spec.ts`; confirm failure names the missing validator or rejected behavior.
+- [x] Implement bounded RIFF/chunk parsing using official WebP container definitions. Reject contradictory dimensions and malformed payload headers; account for odd-chunk padding and bounds before reading. Build the relative URL without allowing key traversal.
+- [x] Re-run the targeted command; all validation assertions pass. Run API typecheck.
+- [x] Commit the validator and its fixtures/tests: `feat(api): validate bounded avatar WebP uploads`.
 
 ### Task 2: Upload, inspect, and serve avatar media
 
@@ -98,7 +98,7 @@
 - Exports `mediaRoutes`, mounted at `/api/v1/media`.
 - Test helper adds `rawApi(method: string, path: string, options: { body?: Uint8Array; cookie?: string | null; headers?: Record<string, string> }): Promise<Response>` and `resetMediaStorage(): Promise<void>`; existing JSON `api` behavior stays intact.
 
-- [ ] Add real D1/R2 tests for upload 201, namespaced distinct keys for two users, byte-for-byte stored/served content, `{ media: null }` before attachment, public-read MIME/ETag/no-store, anonymous write rejection, account/password/impersonation guards, invalid kind/body/MIME/dimensions, and 413 at both caps. Assert upload attempt 61 returns 429 with Retry-After after resetting isolate caches.
+- [x] Add real D1/R2 tests for upload 201, namespaced distinct keys for two users, byte-for-byte stored/served content, `{ media: null }` before attachment, public-read MIME/ETag/no-store, anonymous write rejection, account/password/impersonation guards, invalid kind/body/MIME/dimensions, and 413 at both caps. Assert upload attempt 61 returns 429 with Retry-After after resetting isolate caches.
 
   ```ts
   it('uploads and publicly serves the exact bounded bytes', async () => {
@@ -117,11 +117,11 @@
     expect(new Uint8Array(await image.arrayBuffer())).toEqual(bytes)
   })
   ```
-- [ ] Add a failure-injection service test: a failed asset/audit D1 batch deletes the new object; a failed compensation logs the key/request ID and no image contents. Use narrow binding wrappers only for the failing call; happy paths use real bindings.
-- [ ] Run `npm.cmd run test -w @onelink/api -- test/media.api.spec.ts`; verify new routes fail before implementation.
-- [ ] Implement raw-body upload after guards/throttle, metadata reads, and public byte responses. Insert asset/audit in one D1 batch after R2 put; compensate on failure. Reject undeclared query options. Add `retry-after` to CORS exposed headers, retaining the global body limit and existing security headers.
-- [ ] Implement paginated test-bucket reset for objects created by this suite; call it before resetting DB rows. Public file reads map only validated avatar-path parameters to known active public assets.
-- [ ] Re-run both media suites and API typecheck. Commit: `feat(api): upload and serve owned avatar media`.
+- [x] Add a failure-injection service test: a failed asset/audit D1 batch deletes the new object; a failed compensation logs the key/request ID and no image contents. Use narrow binding wrappers only for the failing call; happy paths use real bindings.
+- [x] Run `npm.cmd run test -w @onelink/api -- test/media.api.spec.ts`; verify new routes fail before implementation.
+- [x] Implement raw-body upload after guards/throttle, metadata reads, and public byte responses. Insert asset/audit in one D1 batch after R2 put; compensate on failure. Reject undeclared query options. Add `retry-after` to CORS exposed headers, retaining the global body limit and existing security headers.
+- [x] Implement paginated test-bucket reset for objects created by this suite; call it before resetting DB rows. Public file reads map only validated avatar-path parameters to known active public assets.
+- [x] Re-run both media suites and API typecheck. Commit: `feat(api): upload and serve owned avatar media`.
 
 ### Task 3: Attach, delete, and recover avatar assets
 
@@ -134,7 +134,7 @@
 - Produces `deleteOwnedAvatar(env: Cloudflare.Env, actor: ActorInfo, id: string, auditor: Auditor): Promise<void>`.
 - Produces `cleanupAvatarMedia(env: Cloudflare.Env, referenceTime?: number): Promise<{ removed: number; failed: number }>`; integrate its counts into the existing maintenance report without dropping existing counters.
 
-- [ ] Add attachment tests for owned key and null-clear, foreign/deleted/wrong-kind/private/unknown assets, absent/standalone/stale preconditions, and untouched identity-only writes. Assert committed changes have one success audit and conflicts have no success audit.
+- [x] Add attachment tests for owned key and null-clear, foreign/deleted/wrong-kind/private/unknown assets, absent/standalone/stale preconditions, and untouched identity-only writes. Assert committed changes have one success audit and conflicts have no success audit.
 
   ```ts
   const user = await createTestUser()
@@ -160,13 +160,13 @@
   ).bind(stale.headers.get('x-request-id')).first<{ total: number }>()
   expect(audits?.total).toBe(0)
   ```
-- [ ] Add deletion tests asserting object/row disappearance, conditional pointer clearing, idempotent retry, foreign 404, missing 204, inactive public read, and retention of a marked row on R2 failure. Prove deleting an old asset leaves a newer attached photo alone.
-- [ ] Add deterministic stale-read tests using narrow D1 wrappers/interleaving barriers: two concurrent attachments with the same expected key permit only one winner; asset deletion between validation and attachment prevents attachment. Assert pointer, rows, and audits agree.
-- [ ] Add maintenance tests with exact timestamps: attached old and unattached recent assets survive; unattached older-than-24-hours and marked assets are removed; at most 100 candidates are processed; one storage failure retains its marked row and does not stop other cleanup. Inject an attachment after candidate selection and verify the final eligibility check protects it. Existing suspension/audit maintenance still passes.
-- [ ] Run `npm.cmd run test -w @onelink/api -- test/media.api.spec.ts test/media.maintenance.spec.ts test/profile.api.spec.ts`; verify expected failures.
-- [ ] Implement conditional avatar update and active-media eligibility in the SQL write, not only a preceding SELECT. Use a conditional audit INSERT in the same D1 batch tied to the successful UPDATE; inspect update changes for 409. Retain existing username uniqueness and normalization behavior.
-- [ ] Implement deletion's mark-and-detach batch with audit, then R2 deletion, then row deletion. Reuse the cleanup primitive for system maintenance with an atomic unattached recheck. Await cleanup and report failures through existing maintenance logging.
-- [ ] Re-run targeted suites, then `npm.cmd test` and API typecheck. Commit: `feat(api): attach and safely remove profile photos`.
+- [x] Add deletion tests asserting object/row disappearance, conditional pointer clearing, idempotent retry, foreign 404, missing 204, inactive public read, and retention of a marked row on R2 failure. Prove deleting an old asset leaves a newer attached photo alone.
+- [x] Add deterministic stale-read tests using narrow D1 wrappers/interleaving barriers: two concurrent attachments with the same expected key permit only one winner; asset deletion between validation and attachment prevents attachment. Assert pointer, rows, and audits agree.
+- [x] Add maintenance tests with exact timestamps: attached old and unattached recent assets survive; unattached older-than-24-hours and marked assets are removed; at most 100 candidates are processed; one storage failure retains its marked row and does not stop other cleanup. Inject an attachment after candidate selection and verify the final eligibility check protects it. Existing suspension/audit maintenance still passes.
+- [x] Run `npm.cmd run test -w @onelink/api -- test/media.api.spec.ts test/media.maintenance.spec.ts test/profile.api.spec.ts`; verify expected failures.
+- [x] Implement conditional avatar update and active-media eligibility in the SQL write, not only a preceding SELECT. Use a conditional audit INSERT in the same D1 batch tied to the successful UPDATE; inspect update changes for 409. Retain existing username uniqueness and normalization behavior.
+- [x] Implement deletion's mark-and-detach batch with audit, then R2 deletion, then row deletion. Reuse the cleanup primitive for system maintenance with an atomic unattached recheck. Await cleanup and report failures through existing maintenance logging.
+- [x] Re-run targeted suites, then `npm.cmd test` and API typecheck. Commit: `feat(api): attach and safely remove profile photos`.
 
 ### Task 4: Browser image processing and crop geometry
 
@@ -177,7 +177,7 @@
 - Produces `initialCrop(width: number, height: number): Crop`, `clampCrop(crop: Crop, width: number, height: number): Crop`, and `zoomCrop(crop: Crop, zoom: number, width: number, height: number): Crop` (zoom 1–4 relative to the initial cover crop, preserving center where possible).
 - Produces `decodePhoto(file: File): Promise<DecodedPhoto>` and `encodeAvatar(photo: DecodedPhoto, crop: Crop): Promise<Blob>`.
 
-- [ ] Write Playwright function checks importing these Vite modules in `page.evaluate`. Assert centered wide/tall crops, boundary clamping, stable zoom center, decoded image rejection above 40 million pixels and 10 MiB, invalid formats/corrupt data, and exported WebP MIME/signature/512-square dimensions/size at most `240 * 1024`.
+- [x] Write Playwright function checks importing these Vite modules in `page.evaluate`. Assert centered wide/tall crops, boundary clamping, stable zoom center, decoded image rejection above 40 million pixels and 10 MiB, invalid formats/corrupt data, and exported WebP MIME/signature/512-square dimensions/size at most `240 * 1024`.
 
   ```js
   const dimensions = await page.evaluate(async () => {
@@ -187,10 +187,10 @@
   if (dimensions.x !== 200 || dimensions.y !== 0 || dimensions.size !== 800)
     throw new Error('wide source must start with a centered square crop')
   ```
-- [ ] Include a JPEG fixture with EXIF orientation 6 and distinct colored corners; assert oriented decoded dimensions and expected exported corner colors. Add unsupported WebP encoder and excessive-output-size cases via scoped canvas overrides restored after each check.
-- [ ] Run the CLI image-check script against the local Vite browser; confirm missing-module/behavior failures before implementation.
-- [ ] Implement source checks and oriented `createImageBitmap` decode. Reject GIF and animated WebP inputs explicitly; source selection never sends bytes to the backend. Encode using qualities `[0.85, 0.75, 0.65, 0.55, 0.45]`, verifying WebP output and bounded size each attempt. Release resources on every rejected decode/export path owned by the helper.
-- [ ] Implement pure crop geometry and repeat the script; all returned assertions pass. Run web typecheck. Commit: `feat(web): crop and encode profile photos in browser`.
+- [x] Include a JPEG fixture with EXIF orientation 6 and distinct colored corners; assert oriented decoded dimensions and expected exported corner colors. Add unsupported WebP encoder and excessive-output-size cases via scoped canvas overrides restored after each check.
+- [x] Run the CLI image-check script against the local Vite browser; confirm missing-module/behavior failures before implementation.
+- [x] Implement source checks and oriented `createImageBitmap` decode. Reject GIF and animated WebP inputs explicitly; source selection never sends bytes to the backend. Encode using qualities `[0.85, 0.75, 0.65, 0.55, 0.45]`, verifying WebP output and bounded size each attempt. Release resources on every rejected decode/export path owned by the helper.
+- [x] Implement pure crop geometry and repeat the script; all returned assertions pass. Run web typecheck. Commit: `feat(web): crop and encode profile photos in browser`.
 
 ### Task 5: Credentialed progress upload and accessible crop dialog
 
@@ -202,8 +202,8 @@
 - Extracts shared `apiErrorFromResponse(status: number, headers: Headers, payload: unknown): ApiError` in `lib/api.ts`; both JSON fetch and XHR use identical envelope/Retry-After semantics. This is targeted transport reuse, not a client rewrite.
 - Dialog props: `{ photo: DecodedPhoto; open: boolean; pending: boolean; phase: 'idle' | 'encoding' | 'uploading' | 'saving'; progress: number | null; error: string | null; onSave: (crop: Crop) => void; onCancel: () => void }`.
 
-- [ ] Add browser assertions for normalized progress, upload credentials/MIME, network/timeout/abort/413/422/429 error envelopes and Retry-After. Use a scoped XHR stub in the Vite browser for deterministic transport events; restore it after each case.
-- [ ] Add dialog interaction assertions in the same script using a disposable runtime React mount: focus trapping/return, Escape/cancel, pending dismissal lock, pointer/touch/arrow movement, zoom/reset, drag bounds, accessible label/help/progress/error, and one Save callback despite repeated clicks. The mount is test-only and lives in the browser script.
+- [x] Add browser assertions for normalized progress, upload credentials/MIME, network/timeout/abort/413/422/429 error envelopes and Retry-After. Use a scoped XHR stub in the Vite browser for deterministic transport events; restore it after each case.
+- [x] Add dialog interaction assertions in the same script using a disposable runtime React mount: focus trapping/return, Escape/cancel, pending dismissal lock, pointer/touch/arrow movement, zoom/reset, drag bounds, accessible label/help/progress/error, and one Save callback despite repeated clicks. The mount is test-only and lives in the browser script.
 
   ```js
   // The test mount opens the real dialog from a button labelled 'Open crop'.
@@ -214,10 +214,10 @@
   if (!(await page.getByRole('button', { name: 'Open crop' }).evaluate(el => el === document.activeElement)))
     throw new Error('Escape must return focus to the opening control')
   ```
-- [ ] Run the UI-check script and confirm missing interfaces fail.
-- [ ] Implement shared error parsing, transport, and native dialog crop viewport. Map pointer deltas through current rendered viewport dimensions into source pixels; maintain pointer capture and touch-action handling. Reset crop when the decoded photo changes. Release no caller-owned photo in this component.
-- [ ] Style within the existing profile design with a responsive dialog that fits 320px width and short viewports. Honor reduced motion and keyboard focus visibility.
-- [ ] Repeat image/UI scripts and web typecheck. Commit: `feat(web): add accessible photo crop and upload controls`.
+- [x] Run the UI-check script and confirm missing interfaces fail.
+- [x] Implement shared error parsing, transport, and native dialog crop viewport. Map pointer deltas through current rendered viewport dimensions into source pixels; maintain pointer capture and touch-action handling. Reset crop when the decoded photo changes. Release no caller-owned photo in this component.
+- [x] Style within the existing profile design with a responsive dialog that fits 320px width and short viewports. Honor reduced motion and keyboard focus visibility.
+- [x] Repeat image/UI scripts and web typecheck. Commit: `feat(web): add accessible photo crop and upload controls`.
 
 ### Task 6: Integrate photo saves, reconciliation, and removal
 
@@ -230,9 +230,9 @@
 - Adds `navigationLocked: boolean` to `IdentityFormProps`; ProfileScreen forwards photo busy state. Its existing `useUnsavedChanges` is the single route blocker for identity drafts and pending photo writes; do not mount a second competing router blocker.
 - Uses the media metadata URL after reads and the key's declared server URL convention for heading images. Fallback on image load failure, reset failure state when key changes.
 
-- [ ] Write a real local-browser flow: register a disposable account, generate a colored JPEG/PNG file, select it, crop, save, reload, replace, and remove. Assert each save response names owned media; exported upload has 512-square dimensions and bounded bytes; public old URLs become 404 and session avatar changes as expected.
-- [ ] Add mocked rejection paths: select/cancel sends zero POSTs; upload/attach failure leaves the saved photo; cleanup failure keeps the committed new photo and exposes Retry cleanup; an attach response lost after commit is reconciled without deleting that asset; a failed reconciliation preserves ambiguous assets for housekeeping instead of guessing.
-- [ ] Pin Review Focus cases: conflict with another tab reloads current metadata; unsaved bio survives photo save/removal/refresh and still triggers navigation warning; slow first-file decode cannot replace the second-file draft; pending save blocks route navigation and duplicate controls; unmount cancels transport and releases decoded resources without firing a stale save callback.
+- [x] Write a real local-browser flow: register a disposable account, generate a colored JPEG/PNG file, select it, crop, save, reload, replace, and remove. Assert each save response names owned media; exported upload has 512-square dimensions and bounded bytes; public old URLs become 404 and session avatar changes as expected.
+- [x] Add mocked rejection paths: select/cancel sends zero POSTs; upload/attach failure leaves the saved photo; cleanup failure keeps the committed new photo and exposes Retry cleanup; an attach response lost after commit is reconciled without deleting that asset; a failed reconciliation preserves ambiguous assets for housekeeping instead of guessing.
+- [x] Pin Review Focus cases: conflict with another tab reloads current metadata; unsaved bio survives photo save/removal/refresh and still triggers navigation warning; slow first-file decode cannot replace the second-file draft; pending save blocks route navigation and duplicate controls; unmount cancels transport and releases decoded resources without firing a stale save callback.
 
   ```js
   await page.getByLabel('Bio', { exact: true }).fill('Unsaved photo-test bio')
@@ -246,10 +246,10 @@
   if ((await page.getByLabel('Bio', { exact: true }).inputValue()) !== 'Unsaved photo-test bio')
     throw new Error('photo save must preserve the unsaved identity draft')
   ```
-- [ ] Add guarded-session cases, image-load initials fallback, same-file reselection, removal confirmation/cancel, and retry-after copy. Run the flow script; confirm failures before integrating.
-- [ ] Implement decode generation tokens and resource cleanup; save sequence encode → upload → conditional attach → cleanup old. Label the file input `Choose profile photo` and crop dialog `Crop your photo`. Use `session.updateProfile` for adoption, preserving session-only fields. Reconcile ambiguous errors using fresh server session and media reads before cleanup. Keep cleanup retries separate from crop/save errors.
-- [ ] Implement confirmed delete and session refresh, including deletion failures after pointer clearing. Extend the identity guard condition with `navigationLocked`; when navigation is blocked during a photo write, its confirmation is pending and cannot proceed until the operation settles. Retain existing discard/keep-editing behavior for identity drafts afterward. Add the photo section, heading avatar, section numbers, and photo jump link; preserve all existing profile guards.
-- [ ] Repeat real/mocked browser flows and web typecheck/build. Commit: `feat(web): upload replace and remove profile photos`.
+- [x] Add guarded-session cases, image-load initials fallback, same-file reselection, removal confirmation/cancel, and retry-after copy. Run the flow script; confirm failures before integrating.
+- [x] Implement decode generation tokens and resource cleanup; save sequence encode → upload → conditional attach → cleanup old. Label the file input `Choose profile photo` and crop dialog `Crop your photo`. Use `session.updateProfile` for adoption, preserving session-only fields. Reconcile ambiguous errors using fresh server session and media reads before cleanup. Keep cleanup retries separate from crop/save errors.
+- [x] Implement confirmed delete and session refresh, including deletion failures after pointer clearing. Extend the identity guard condition with `navigationLocked`; when navigation is blocked during a photo write, its confirmation is pending and cannot proceed until the operation settles. Retain existing discard/keep-editing behavior for identity drafts afterward. Add the photo section, heading avatar, section numbers, and photo jump link; preserve all existing profile guards.
+- [x] Repeat real/mocked browser flows and web typecheck/build. Commit: `feat(web): upload replace and remove profile photos`.
 
 ### Task 7: Verify the complete feature and document its local use
 
@@ -257,11 +257,11 @@
 
 **Interfaces:** No new API; evidence must match the spec and actual tested behavior.
 
-- [ ] Run `npm.cmd run typecheck`, `npm.cmd run build`, and `npm.cmd test`. Require clean exits and all tests passing. Investigate failures with systematic-debugging; add regression tests for material behavioral fixes.
-- [ ] Run all three committed browser scripts against fresh healthy local API/Vite servers. Inspect 320/390/768/1440 widths and a short mobile viewport; require no overflow, usable drag/zoom/buttons, correct keyboard focus, preserved identity drafts, and zero unexpected JavaScript errors. Capture clean screenshots after fonts settle with reduced motion.
-- [ ] Update README with actual photo limits/local run and browser-check commands. Update roadmap status for completed avatar media/crop work only; page images and other profile features remain accurate about their implementation status.
-- [ ] Invoke requesting-code-review for the complete delta from the preserved UI baseline; provide the approved spec, plan, changed files, and actual verification results. Address important findings and rerun the affected checks.
-- [ ] Commit documentation and any reviewed fixes in focused commits. Report what works, test evidence, local server URLs, and any material limitations. Let the user test and mark this feature active before beginning the next profile feature.
+- [x] Run `npm.cmd run typecheck`, `npm.cmd run build`, and `npm.cmd test`. Require clean exits and all tests passing. Investigate failures with systematic-debugging; add regression tests for material behavioral fixes.
+- [x] Run all three committed browser scripts against fresh healthy local API/Vite servers. Inspect 320/390/768/1440 widths and a short mobile viewport; require no overflow, usable drag/zoom/buttons, correct keyboard focus, preserved identity drafts, and zero unexpected JavaScript errors. Capture clean screenshots after fonts settle with reduced motion.
+- [x] Update README with actual photo limits/local run and browser-check commands. Update roadmap status for completed avatar media/crop work only; page images and other profile features remain accurate about their implementation status.
+- [x] Invoke requesting-code-review for the complete delta from the preserved UI baseline; provide the approved spec, plan, changed files, and actual verification results. Address important findings and rerun the affected checks.
+- [x] Commit documentation and any reviewed fixes in focused commits. Report what works, test evidence, local server URLs, and any material limitations. Let the user test and mark this feature active before beginning the next profile feature.
 
 ## Handoff
 
@@ -273,3 +273,11 @@ implementer and review gate for each task.
 
 Implementation starts only after the user reviews this plan and selects an
 execution method.
+
+## Execution result
+
+All seven tasks completed in feature/profile-photo. Final evidence: 199/199 API tests, typecheck and production build pass; image, UI, flow, state, and interrupted-response browser checks pass. Mobile screenshots cover 320/390/768/1440 widths. Independent review found one Important response-body recovery issue, reproduced RED and fixed GREEN; no Critical or Minor findings.
+
+Execution rulings: upload throttles reject exhausted budgets (cost: wait until reset); narrow profile refresh preserves drafts (cost: platform settings wait for a full refresh); public renderer/full preview stay deferred (cost: public-page photo display waits for that work); existing identity/social behavior and styling are preserved (cost: their existing limitations remain until their feature passes).
+
+Local preview: http://127.0.0.1:5174/app/profile, with isolated local data. The user requested merging into main; integration preserves the existing generic media API alongside managed avatar endpoints.

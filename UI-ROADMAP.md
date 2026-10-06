@@ -80,12 +80,21 @@ new UI owner should do — they are cheap, and they are what would promote U0/U1
 
 ### 0.2 To build — in order
 
+**Profile live preview is implemented.** The existing `/app/profile` editor now
+previews unsaved identity, photo crops, social-link edits/additions, visibility,
+and order. Save remains explicit; cancel/undo restores saved values. This is the
+client-side profile preview. Top navbar links to **Profile** (`/app/profile`)
+and **Socials** (`/app/socials`) separate photo/details, security, and session
+information from social links and preview. The avatar and username appear at the
+top right; switching pages preserves drafts. U9's server-driven page preview, sharing, and QR
+tools below remain separate work.
+
 | Phase | Produces | Needs | Can start |
 | --- | --- | --- | --- |
 | **U2** ⏳ | `/app/pages`, `/app/pages/new`, plus the `requestList`/`Pagination` and `UnavailableResource` primitives | R1.1 ✅ exists | **today — this is next** |
 | **U3** ⏳ | `/app/pages/:id`: appearance, links, publication, plus `SaveStateNotice` and `PageRenderer` | R1.1 ✅ exists | today |
 | **U4** ⏳ | the real `/:slug` renderer (not the skeleton) | the public read endpoint, which exists | today — identity only arrives in **U9** |
-| **U5** 🚧 | the avatar picker and in-browser crop, `features/media/` | **R1.3 — not built** | after R1.3 |
+| **U5** ✅ | avatar picker, browser crop/resize, upload, replace/remove | R1.3 avatar API exists | avatar flow implemented; generic page-image API exists, picker UI pending |
 | **U6** 🚧 | the address field, live availability check, and the rename confirmation | **R1.4 — not built** | after R1.4 |
 | **U7** 🚧 | link groups, `openInNewTab`, bulk, trash and restore, thumbnails, time windows | **R1.5 — not built** | after R1.5 |
 | **U8** 🚧 | autosave, the unpublished-changes state, the version list | **R1.6 — not built** | after R1.6 |
@@ -275,7 +284,7 @@ instead of to a dialog about a form that can no longer be saved.
 | **U2** My pages & create | `/app/pages`, `/app/pages/new` | R1.1 ✅ | yes — API exists |
 | **U3** Page editor: appearance, links, publish | `/app/pages/:id` | R1.1 ✅ | yes — API exists |
 | **U4** Public renderer | `/:slug`, `/p/:slug` | the public read endpoint, which exists today but is identity-poor | yes — completed by U9 |
-| **U5** Media picker & crop | avatar on `/app/profile` | **R1.3** ⏳ | no — blocked on R1.3 |
+| **U5** Media picker & crop | avatar on `/app/profile` | R1.3 avatar API | implemented |
 | **U6** Address field & rename | address section in `/app/pages/:id` | **R1.4** ⏳ | no — blocked on R1.4 |
 | **U7** Links v2 in the editor | groups, bulk, trash, thumbnails, windows | **R1.5** ⏳ | no — blocked on R1.5 |
 | **U8** Autosave, unpublished changes, versions | editor save state, version list | **R1.6** ⏳ | no — blocked on R1.6 |
@@ -447,7 +456,13 @@ Identity fields (avatar, bio, location, pronouns, socials) are **absent from thi
 today**. U4 renders what is there and does not fetch them through protected endpoints
 to look complete (ground rule 3). U9 adds them when R1.7 puts them in the payload.
 
-### U5 — Media picker and crop 🚧 *(blocked on R1.3)*
+### U5 — Media picker and crop ✅ *(avatars implemented)*
+
+The profile photo flow includes local crop/zoom/reset, bounded WebP encoding,
+progress, confirmed removal, concurrent-edit detection, ambiguous-response
+reconciliation, cleanup retries, and initials fallback. Native dialog controls
+support keyboard and pointer/touch input. No crop library was added. Link
+thumbnail reuse remains U7 work.
 
 | | |
 | --- | --- |

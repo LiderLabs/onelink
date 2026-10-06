@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useContext, useEffect, useState } from 'react'
+import { useMatch } from 'react-router-dom'
 import { useSession } from '../../lib/session'
 import { Notice } from '../../components/Notice'
 import { Splash } from '../../components/StatusScreens'
@@ -6,6 +7,10 @@ import { AccountRecord } from './AccountRecord'
 import { ChangePasswordForm } from './ChangePasswordForm'
 import { IdentityForm } from './IdentityForm'
 import { SocialsEditor } from './SocialsEditor'
+import { ProfilePhotoEditor } from './ProfilePhotoEditor'
+import { ProfileNavigationContext } from './ProfileHeader'
+import { ProfilePreview } from './ProfilePreview'
+import type { PreviewIdentity, PreviewPhoto, PreviewSocials } from './ProfilePreview'
 import './profile.css'
 
 // Keep each section's existing resource and session guards together while
@@ -13,11 +18,16 @@ import './profile.css'
 export function ProfileScreen() {
   const session = useSession()
   const user = session.user
+  const { photoBusy, setPhotoBusy } = useContext(ProfileNavigationContext)!
+  const tab = useMatch('/app/socials') ? 'socials' : 'profile'
+  const [previewIdentity, setPreviewIdentity] = useState<PreviewIdentity | null>(null)
+  const [previewPhoto, setPreviewPhoto] = useState<PreviewPhoto | null>(null)
+  const [previewSocials, setPreviewSocials] = useState<PreviewSocials>({ links: [], loading: true, unavailable: false })
   useEffect(() => {
     const previous = document.title
-    document.title = `Your profile · ${session.platformName}`
+    document.title = `${tab === 'profile' ? 'Your profile' : 'Your socials'} · ${session.platformName}`
     return () => { document.title = previous }
-  }, [session.platformName])
+  }, [session.platformName, tab])
 
   if (!user) return <Splash label="Loading your account" />
 
@@ -25,25 +35,13 @@ export function ProfileScreen() {
   const impersonated = user.impersonatedBy !== null
   const usable = user.status === 'active'
   const readable = usable && !forced
-  const initials = user.displayName.trim().split(/\s+/).slice(0, 2)
-    .map(word => Array.from(word)[0]).join('').toUpperCase() || '@'
   const blockedReason = !usable
     ? 'Social links are unavailable while your account is restricted.'
     : 'Change your temporary password in the security section to access your social links.'
 
   return (
     <div className="profile-screen">
-      <header className="profile-heading">
-        <div className="profile-person">
-          <span className="profile-monogram" aria-hidden="true">{initials}</span>
-          <div className="profile-heading-text">
-            <p className="profile-kicker">Your profile</p>
-            <h1>{user.displayName}</h1>
-            <p className="profile-handle">@{user.username}</p>
-          </div>
-        </div>
-        <p className="profile-heading-copy">The details that make<br className="hidden sm:block" /> this space yours.</p>
-      </header>
+      <h1 className="sr-only">{tab === 'profile' ? 'Your profile' : 'Your socials'}</h1>
 
       {impersonated ? <Notice tone="warning" label="Read-only support session">
         You are viewing this account as an administrator. Profile details and social links are read-only.
@@ -55,10 +53,10 @@ export function ProfileScreen() {
         Your account is restricted. You can view your account details here, but changes are unavailable.
       </Notice> : null}
 
-      <div className="profile-content">
+      <div className="profile-content profile-tab-panel" hidden={tab !== 'profile'}>
         <div className="profile-editors">
-          <IdentityForm user={user} disabled={!usable || forced || impersonated} />
-          <SocialsEditor readable={readable} writable={readable && !impersonated} blockedReason={blockedReason} />
+          <ProfilePhotoEditor user={user} readable={readable} writable={readable && !impersonated} onBusyChange={setPhotoBusy} onPreviewChange={setPreviewPhoto} />
+          <IdentityForm user={user} disabled={!usable || forced || impersonated} navigationLocked={photoBusy} onPreviewChange={setPreviewIdentity} />
           <section className="profile-section profile-security" aria-labelledby="security">
             <div className="profile-section-heading">
               <div>
@@ -73,14 +71,23 @@ export function ProfileScreen() {
             <ChangePasswordForm forced={forced} />
           </section>
         </div>
-        <aside className="profile-summary" aria-label="Your account">
-          <AccountRecord user={user} capabilities={session.capabilities} />
+        <aside className="profile-summary" aria-label="Session information">
+          <AccountRecord user={user} capabilities={session.capabilities} sessionOnly />
           <nav className="profile-jump-nav" aria-label="Profile sections">
             <p>On this page</p>
+            <a href="#photo">Profile photo <span aria-hidden="true">↗</span></a>
             <a href="#identity">Profile details <span aria-hidden="true">↗</span></a>
-            <a href="#socials">Social links <span aria-hidden="true">↗</span></a>
             <a href="#security">Security <span aria-hidden="true">↗</span></a>
+            <a href="#account-record">Session details <span aria-hidden="true">↗</span></a>
           </nav>
+        </aside>
+      </div>
+      <div className="profile-content profile-tab-panel" hidden={tab !== 'socials'}>
+        <div className="profile-editors">
+          <SocialsEditor readable={readable} writable={readable && !impersonated} blockedReason={blockedReason} onPreviewChange={setPreviewSocials} />
+        </div>
+        <aside className="profile-summary" aria-label="Public profile preview">
+          <ProfilePreview identity={previewIdentity ?? user} avatarKey={user.avatarKey} photo={previewPhoto} socials={previewSocials} />
         </aside>
       </div>
     </div>

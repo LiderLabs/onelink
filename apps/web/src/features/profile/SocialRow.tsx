@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { errorMessageFor, fieldErrorsFrom } from '../../lib/api'
 import { Button } from '../../components/Button'
@@ -7,6 +7,7 @@ import { Notice } from '../../components/Notice'
 import type { SocialLink, SocialPlatform, UpdateSocialInput } from '../../lib/types'
 import { socialsApi } from './api'
 import { MAX_SOCIAL_URL_LENGTH, SOCIAL_PLATFORM_OPTIONS, platformLabel } from './social-platforms'
+import type { PreviewSocial } from './ProfilePreview'
 
 // ============================================================================
 // One social row.
@@ -33,6 +34,7 @@ export interface SocialRowProps {
   onMove: (index: number, delta: -1 | 1) => void
   onDelete: (social: SocialLink) => void
   onSaved: (message: string) => void
+  onPreviewChange?: (id: string, draft: Partial<PreviewSocial> | null) => void
 }
 
 export function SocialRow({
@@ -44,6 +46,7 @@ export function SocialRow({
   onMove,
   onDelete,
   onSaved,
+  onPreviewChange,
 }: SocialRowProps) {
   const [editing, setEditing] = useState(false)
   const [platform, setPlatform] = useState<string>(social.platform)
@@ -52,6 +55,9 @@ export function SocialRow({
   const [fieldErrors, setFieldErrors] = useState<{ platform?: string; url?: string }>({})
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  useEffect(() => {
+    onPreviewChange?.(social.id, editing ? { platform: platform as SocialPlatform, url, isVisible } : null)
+  }, [social.id, editing, platform, url, isVisible, onPreviewChange])
 
   const label = platformLabel(social.platform)
 

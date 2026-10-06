@@ -104,12 +104,16 @@ export const updateProfileSchema = z
     pronouns: pronounsSchema.nullable().optional(),
     avatarKey: avatarKeySchema.nullable().optional(),
     username: usernameSchema.optional(),
+    expectedAvatarKey: avatarKeySchema.nullable().optional(),
     // R1.2 added `location` and `pronouns` above, exactly as R1.1 promised.
     // R1.3 lands `avatarKey`: the SHAPE is checked here, ownership against
     // `media_assets` is checked in the service before the key is ever trusted.
   })
   .refine((value) => Object.keys(value).length > 0, {
     error: 'Supply at least one field to update.',
+  })
+  .refine(value => value.expectedAvatarKey === undefined || value.avatarKey !== undefined, {
+    error: 'Supply a profile photo change with its current key.', path: ['avatarKey'],
   })
 
 export type UpdateProfileBody = z.infer<typeof updateProfileSchema>

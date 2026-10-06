@@ -64,7 +64,8 @@ export const routes: RouteObject[] = [
               // U2 turns this into "My pages"; until that screen exists, sending
               // someone to a list that is not there would be a worse start.
               { index: true, element: <Navigate to="/app/profile" replace /> },
-              { path: 'profile', element: <ProfileRoute /> },
+              // One persistent editor preserves drafts across the two navbar destinations.
+              { element: <ProfileRoute />, children: [{ path: 'profile', element: <></> }, { path: 'socials', element: <></> }] },
               { path: '*', element: <ConsoleNotFoundRoute /> },
             ],
           },

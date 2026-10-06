@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { ChangeEvent, FormEvent } from 'react'
 import { ApiError, errorMessageFor, fieldErrorsFrom } from '../../lib/api'
 import { useDirtyForm, useUnsavedChanges } from '../../lib/dirty-form'
@@ -8,6 +9,7 @@ import { Button } from '../../components/Button'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Field, TextareaField } from '../../components/Field'
 import { Notice } from '../../components/Notice'
+import type { PreviewIdentity } from './ProfilePreview'
 
 // ============================================================================
 // Identity — the first section of `/app/profile` (R1.1, extended by R1.2).
@@ -134,14 +136,17 @@ export interface IdentityFormProps {
   user: SessionUser
   /** A session that may read but not write: impersonated, forced rotation, suspended. */
   disabled: boolean
+  navigationLocked: boolean
+  onPreviewChange?: (identity: PreviewIdentity) => void
 }
 
-export function IdentityForm({ user, disabled }: IdentityFormProps) {
+export function IdentityForm({ user, disabled, navigationLocked, onPreviewChange }: IdentityFormProps) {
   const session = useSession()
 
   const baseline = useMemo(() => baselineOf(user), [user])
   const form = useDirtyForm<IdentityDraft>(baseline)
-  const guard = useUnsavedChanges(form.dirty && !disabled)
+  const guard = useUnsavedChanges((form.dirty && !disabled) || navigationLocked,
+    navigationLocked ? [] : ['/app/profile', '/app/socials'])
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [banner, setBanner] = useState<string | null>(null)
@@ -159,6 +164,7 @@ export function IdentityForm({ user, disabled }: IdentityFormProps) {
   }, [session.user, guard])
 
   const values = form.draft?.values ?? baseline
+  useEffect(() => { onPreviewChange?.(values) }, [values, onPreviewChange])
 
   const change = (key: keyof IdentityDraft, value: string) => {
     form.setValue(key, value)
@@ -222,7 +228,7 @@ export function IdentityForm({ user, disabled }: IdentityFormProps) {
     <section aria-labelledby="identity" className="profile-section profile-identity">
       <div className="profile-section-heading">
         <div>
-          <p className="profile-section-number" aria-hidden="true">01</p>
+          <p className="profile-section-number" aria-hidden="true">02</p>
           <h2 id="identity">Profile details</h2>
         </div>
         {/* A live summary rather than a silent disabled button: the reader can
@@ -346,8 +352,9 @@ export function IdentityForm({ user, disabled }: IdentityFormProps) {
         </div>
       </form>
 
-      <ConfirmDialog
+      {createPortal(<ConfirmDialog
         open={guard.blocked}
+        pending={navigationLocked}
         title="Leave with unsaved identity changes?"
         confirmLabel="Discard and leave"
         cancelLabel="Keep editing"
@@ -356,7 +363,7 @@ export function IdentityForm({ user, disabled }: IdentityFormProps) {
       >
         Your edits have not been saved. Leaving now discards them; the account still holds the
         values shown before you started typing.
-      </ConfirmDialog>
+      </ConfirmDialog>, document.body)}
     </section>
   )
 }

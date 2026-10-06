@@ -1,7 +1,7 @@
 import { formatDateTime, formatRelative } from '../../lib/css'
 import type { SessionUser } from '../../lib/types'
 
-export function AccountRecord({ user, capabilities }: { user: SessionUser; capabilities: string[] }) {
+export function AccountRecord({ user, capabilities, sessionOnly = false }: { user: SessionUser; capabilities: string[]; sessionOnly?: boolean }) {
   const facts = [
     { label: 'Username', value: `@${user.username}` },
     { label: 'Email', value: user.email },
@@ -18,24 +18,24 @@ export function AccountRecord({ user, capabilities }: { user: SessionUser; capab
   return (
     <section className="profile-account" aria-labelledby="account-record">
       <div className="profile-account-title">
-        <h2 id="account-record">Your account</h2>
+        <h2 id="account-record">{sessionOnly ? 'Session details' : 'Your account'}</h2>
         <span className="profile-account-status"><span aria-hidden="true">●</span> {user.status}</span>
       </div>
-      <p className="profile-account-description">The essentials, all in one place.</p>
+      <p className="profile-account-description">{sessionOnly ? 'Your sign-in and current session.' : 'The essentials, all in one place.'}</p>
       <dl className="profile-account-facts">
-        {facts.map(fact => <div key={fact.label}>
+        {(sessionOnly ? sessionFacts : facts).map(fact => <div key={fact.label}>
           <dt>{fact.label}</dt>
           <dd>{fact.value}</dd>
           {fact.label === 'Email' ? <dd className="profile-email-state">{user.emailVerified ? 'Email verified' : 'Email not verified'}</dd> : null}
         </div>)}
       </dl>
-      <p className="profile-account-help">Email, role, and account status are managed by the platform team.</p>
+      {!sessionOnly ? <><p className="profile-account-help">Email, role, and account status are managed by the platform team.</p>
       <details className="profile-session-details">
         <summary>Session details</summary>
         <dl>
           {sessionFacts.map(fact => <div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}
         </dl>
-      </details>
+      </details></> : null}
     </section>
   )
 }

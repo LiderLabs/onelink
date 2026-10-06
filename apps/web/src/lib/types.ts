@@ -177,6 +177,8 @@ export interface SocialsResponse {
  * sends `null` for the clearable ones and never an empty string.
  */
 export interface UpdateProfileInput {
+  avatarKey?: string | null
+  expectedAvatarKey?: string | null
   displayName?: string
   bio?: string | null
   location?: string | null

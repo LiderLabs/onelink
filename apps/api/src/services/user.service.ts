@@ -540,14 +540,9 @@ export interface UpdateProfileInput {
   bio?: string | null | undefined
   location?: string | null | undefined
   pronouns?: string | null | undefined
-  /**
-   * R1.3. `undefined` = "not in the body", `null` = "clear it", a string = "point
-   * at this object". The string is a key and never a URL: the route's schema
-   * checked its shape, and this function checks that the caller OWNS it before
-   * anything is written — a key is only as trustworthy as the row behind it.
-   */
-  avatarKey?: string | null | undefined
   username?: string | undefined
+  avatarKey?: string | null | undefined
+  expectedAvatarKey?: string | null | undefined
 }
 
 /**
@@ -581,6 +576,24 @@ export async function updateOwnProfile(
 ): Promise<ApiUser> {
   const target = await requireUserById(db, actor.id)
 
+  const avatarChange = input.avatarKey !== undefined
+  const expectedAvatarKey = input.expectedAvatarKey === undefined ? target.avatar_key : input.expectedAvatarKey
+  if (avatarChange) {
+    // Legacy clients can still attach their general media uploads. The editor's
+    // managed uploads require an explicit precondition; all writes remain atomic.
+    if (input.expectedAvatarKey === undefined && input.avatarKey !== null) {
+      await assertOwnsAvatarKey(db, actor.id, input.avatarKey!)
+      const asset = await db.prepare('SELECT checksum FROM media_assets WHERE r2_key=?').bind(input.avatarKey).first<{ checksum: string | null }>()
+      if (asset?.checksum === null) throw badRequest('Supply the current profile photo key.')
+    }
+    if (input.avatarKey !== null) {
+      const asset = await db.prepare("SELECT id FROM media_assets WHERE r2_key=? AND owner_user_id=? AND status='active' AND bucket='public' AND kind='avatar'")
+        .bind(input.avatarKey, actor.id).first()
+      if (!asset) throw notFound('Photo')
+    }
+    if (target.avatar_key !== expectedAvatarKey) throw conflict('Your profile photo changed. Reload it and try again.')
+  }
+
   const patch: string[] = []
   const binds: unknown[] = []
   const before: Record<string, unknown> = {}
@@ -600,6 +613,7 @@ export async function updateOwnProfile(
     if (displayName.length === 0) throw badRequest('A display name is required.')
     setField('display_name', displayName, 'displayName')
   }
+  if (avatarChange) setField('avatar_key', input.avatarKey, 'avatarKey')
   if (input.bio !== undefined) {
     // `""` and `null` both mean "clear it" — the column is nullable and that is
     // what an emptied textarea sends.
@@ -620,19 +634,6 @@ export async function updateOwnProfile(
     const pronouns =
       input.pronouns === null ? null : sanitizeSingleLine(input.pronouns, MAX_PRONOUNS_LENGTH) || null
     setField('pronouns', pronouns, 'pronouns')
-  }
-  if (input.avatarKey !== undefined) {
-    // R1.3. The SHAPE was checked by `avatarKeySchema`; ownership cannot be, so it
-    // is settled here against `media_assets` before the key is trusted — otherwise
-    // a caller could point their own profile at somebody else's upload simply by
-    // copying a key out of a public page. `null` is "no avatar" and needs no check.
-    //
-    // Replacing an avatar does NOT delete the one it replaced: this endpoint
-    // changes which object the account POINTS AT, and `DELETE /media/:id` removes
-    // an object. Folding a delete in here would make a profile save silently
-    // destroy a file the same account may have just uploaded on purpose.
-    if (input.avatarKey !== null) await assertOwnsAvatarKey(db, actor.id, input.avatarKey)
-    setField('avatar_key', input.avatarKey, 'avatarKey')
   }
   if (input.username !== undefined) {
     const username = normalizeUsername(input.username)
@@ -663,13 +664,17 @@ export async function updateOwnProfile(
     after,
   })
 
-  await db.batch([
-    db
-      .prepare(`UPDATE users SET ${patch.join(', ')}, updated_at = ? WHERE id = ?`)
-      .bind(...binds, timestamp, target.id),
-    auditInsertStmt(db, entry),
+  const eligibility = avatarChange && input.avatarKey !== null
+    ? " AND EXISTS (SELECT 1 FROM media_assets WHERE r2_key=? AND owner_user_id=? AND status='active' AND kind='avatar' AND bucket='public')" : ''
+  const results = await db.batch([
+    db.prepare(`UPDATE users SET ${patch.join(', ')}, updated_at = ? WHERE id = ?${avatarChange ? ' AND avatar_key IS ?' : ''}${eligibility}`)
+      .bind(...binds, timestamp, target.id, ...(avatarChange ? [expectedAvatarKey] : []), ...(eligibility ? [input.avatarKey, target.id] : [])),
+    auditInsertStmt(db, entry, avatarChange),
   ])
-
+  if (avatarChange && results[0]?.meta.changes !== 1) {
+    await auditInsertStmt(db, { ...entry, status: 'denied', after: null }).run()
+    throw conflict('Your profile photo changed. Reload it and try again.')
+  }
   return toApiUser(await requireUserById(db, target.id))
 }
 

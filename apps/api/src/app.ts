@@ -81,7 +81,7 @@ export function createApp() {
       credentials: true,
       allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
       allowHeaders: ['content-type', 'x-request-id'],
-      exposeHeaders: ['x-request-id', 'x-ratelimit-limit', 'x-ratelimit-remaining', 'x-ratelimit-reset'],
+      exposeHeaders: ['x-request-id', 'x-ratelimit-limit', 'x-ratelimit-remaining', 'x-ratelimit-reset', 'retry-after'],
       maxAge: 600,
     })(c, next)
   })
