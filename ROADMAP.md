@@ -9,7 +9,8 @@ phase names the files it touches, the migration it adds, the tests that must cov
 and the criteria that say "done". Where something does not exist yet, this file says
 so plainly rather than assuming it.
 
-Verified against commit `1e5db86` (`feat(api): owner-facing pages and links API`).
+Verified against commit `1e5db86` (`feat(api): owner-facing pages and links API`), with
+§1.1, §1.6 and §1.8 refreshed to the tree after R1.3.
 
 ## How to read this
 
@@ -47,11 +48,13 @@ Status markers: ✅ done · 🔨 next · ⏳ planned · 🎨 UI (deferred) · �
 
 | Surface | File | State |
 | --- | --- | --- |
-| Auth: register, login, logout, session, change-password, forgot/reset | `src/routes/auth.ts` | ✅ |
+| Auth: register, login, logout, session, profile (`PATCH /me`), change-password, forgot/reset | `src/routes/auth.ts` | ✅ |
 | Admin users: list, detail, create, invite, sanction, suspend, ban, notes, sessions, revoke, password reset | `src/routes/users.ts` | ✅ |
 | Settings, audit log (+ export), health | `src/routes/{settings,audit,health}.ts` | ✅ |
 | Public: settings, page read | `src/routes/public.ts` | ✅ |
 | Owner pages & links | `src/routes/pages.ts` | ✅ |
+| Profile & socials | `src/routes/profile.ts` | ✅ |
+| Media / avatars | `src/routes/media.ts` | ✅ |
 
 `pages.ts` exposes exactly 11 routes:
 
@@ -133,8 +136,8 @@ Constants in `src/lib/constants.ts`: `MAX_SLUG_LENGTH = 48`, `MAX_URL_LENGTH = 2
 - Rate limits: `pages_write_user` (120/h, block), **`media_upload_user` (60/h,
   throttle — already present)**, `report_create_ip`, `api_global`, `login_*`,
   `register_ip`, `password_reset_ip`.
-- **`profile_write_user` does not exist** and must be seeded before the profile
-  PATCH can be limited.
+- **`profile_write_user`** was seeded in R1.1 (60/h, `block`) and is the one budget
+  `PATCH /auth/me` and the `/profile/socials` writes share.
 
 ### 1.7 Two collisions this plan must fix
 
@@ -155,10 +158,11 @@ Constants in `src/lib/constants.ts`: `MAX_SLUG_LENGTH = 48`, `MAX_URL_LENGTH = 2
 
 ### 1.8 Test suites
 
-`apps/api/test/`: `auth.spec.ts`, `pages.api.spec.ts`, `signup.spec.ts`,
-`unit.lib.spec.ts`, `users.admin.spec.ts` — 133 tests across the five (127 before
-R1.0's new cases), run in workerd against a real local D1 with no mocks. (`README.md`
-says 94 and lists no `pages` route; it is stale — fixing it is part of R1.9.)
+`apps/api/test/`: `auth.spec.ts`, `pages.api.spec.ts`, `profile.api.spec.ts`,
+`socials.api.spec.ts`, `avatar.api.spec.ts`, `media.api.spec.ts`,
+`media.maintenance.spec.ts`, `media.validation.spec.ts`, `signup.spec.ts`,
+`unit.lib.spec.ts`, `users.admin.spec.ts` — **242 tests across eleven**, run in workerd
+against a real local D1 with no mocks.
 
 ## 2. Release map
 
@@ -174,10 +178,11 @@ Release 1. That one-way dependency is the whole argument for this order.
 
 The build order is **forced**, not stylistic:
 
-- **R1.1 first.** Every later screen reads `GET /pages/mine`, which today returns raw
-  `PageRow` objects (snake_case) — `listAccessiblePages` hands back rows, as
-  `listOwnPages` did before R1.0 — while `GET /pages/:id` returns the owner DTO. A
-  client built against the leaking list is a client rewritten.
+- **R1.1 first (done).** Every later screen reads `GET /pages/mine`, which returned raw
+  `PageRow` objects (snake_case) — `listAccessiblePages` handed back rows, as
+  `listOwnPages` did before R1.0 — while `GET /pages/:id` returned the owner DTO. A
+  client built against the leaking list would have been a client rewritten; R1.1 closed
+  that before any screen consumed it.
 - **R1.2–R1.3 before R1.5.** A link thumbnail is an R2 key; the upload pipeline and key
   namespacing must exist before a `thumbnail_key` column can point anywhere.
 - **R1.5 before R1.6.** The publish snapshot is `{ page, links }` today. The draft model
@@ -230,11 +235,17 @@ Cheap now, expensive later. Backend only — no frontend or schema change.
   now also pins that a page taken down keeps its revision. The 404-not-403 rule was
   already covered by `answers 404 — not 403 — for another user's page`.
 
-### R1.1 — Owner pages API fixes 🔨 *(the approved A1–A8)*
+### R1.1 — Owner pages API fixes ✅ *(the approved A1–A8)*
+
+Implemented. `GET /pages/mine` maps rows through `toApiPage`, so the list returns owner
+DTOs with real `meta` (`page`/`limit`/`total`/`totalPages`); `PATCH /auth/me` writes
+self-service `displayName`/`bio`/`username` behind `profile_write_user` (R1.3 later
+extended the same handler with `avatarKey`/`expectedAvatarKey`). `requireOwnerSelf` moved
+into `middleware/auth.ts`. Covered by `pages.api.spec.ts` and `profile.api.spec.ts`.
 
 | | |
 | --- | --- |
-| **API** | `GET /api/v1/pages/mine` maps each row through `toApiPage` (today it returns raw `PageRow[]`, so `user_id`, `deleted_at`, `content_revision` and every snake_case column leak). List `meta` (`page`/`limit`/`total`/`totalPages`) is already produced by `list()` — add the assertion that locks it in. New `PATCH /api/v1/auth/me` for self-service `displayName`/`bio`/`username`. |
+| **API** | `GET /api/v1/pages/mine` maps each row through `toApiPage`, so the raw `PageRow[]` (with `user_id`, `deleted_at`, `content_revision` and every snake_case column) no longer leaks. List `meta` (`page`/`limit`/`total`/`totalPages`) is already produced by `list()` — add the assertion that locks it in. New `PATCH /api/v1/auth/me` for self-service `displayName`/`bio`/`username`. |
 | **Schema** | none |
 | **Seed** | add `profile_write_user` (60/h, `block`). `pages_write_user` and `media_upload_user` already exist. |
 | **Guards** | Move the duplicated `requireOwnerSelf` out of `routes/pages.ts` into `middleware/auth.ts` and compose it on `PATCH /auth/me`, so "an admin acting as a user cannot write as them" holds on the new surface too. Chain order stays `requireActiveAccount → requirePasswordSettled → requireUnimpersonated → rateLimit → readJson`. |
@@ -243,14 +254,20 @@ Cheap now, expensive later. Backend only — no frontend or schema change.
 | **Exit** | `/mine` returns owner DTOs with `meta`; a signed-in `user` can change their own display name, bio and username; every new write surface has a 429 test. |
 | **UI** 🎨 | `requestList` helper in `apps/web/src/lib/api.ts`, the pages dashboard and the profile form. |
 
-### R1.2 — Profile & identity API ⏳
+### R1.2 — Profile & identity API ✅
+
+Implemented. `migrations/0003_profile_fields.sql` adds `users.location`/`users.pronouns`
+and the `user_social_links` table; `src/routes/profile.ts` (mounted at `/api/v1/profile`)
+serves socials CRUD, reorder and visibility behind the shared `profile_write_user` budget,
+and `toApiUser` carries `location`/`pronouns`. Covered by `profile.api.spec.ts` and
+`socials.api.spec.ts`.
 
 | | |
 | --- | --- |
 | **Schema** | `0003_profile_fields.sql`: `users.location TEXT`, `users.pronouns TEXT`; new `user_social_links (id, user_id, platform, url, position, is_visible, created_at, updated_at)` with `UNIQUE(user_id, position)` and `user_id` ON DELETE RESTRICT. Add `user_social_links` to `VOLATILE_TABLES` **before** `users` (child rows first, or the reset batch aborts). |
 | **API** | `toApiUser` gains `location`/`pronouns`. Socials as their own resource (**D9**): `GET`/`POST /api/v1/profile/socials`, `PATCH`/`DELETE /api/v1/profile/socials/:id`, plus an order route mirroring `PUT /pages/:id/links/order`. |
 | **Policy** | Platform enum in `lib/constants.ts` (same pattern as `DEFAULT_RESERVED_SLUGS`), validated in zod **and** re-checked in the service — 0003 adds these columns with `ALTER TABLE`, and SQLite cannot CHECK what a later migration adds. |
-| **Caps** | The spec asks for `displayName` ≤ 50 and `bio` ≤ 160; today they are 80 and 500. **D12** — enforce on write, never truncate a stored value (lenient read, strict write). |
+| **Caps** | The spec's `displayName` ≤ 50 and `bio` ≤ 160 are now enforced on write. **D12** — enforce on write, never truncate a stored value (lenient read, strict write). |
 | **Tests** | `profile.api.spec.ts`: socials CRUD, reorder, visibility toggle, `422` unknown platform, `404` (never 403) for a social row belonging to someone else. |
 | **Exit** | The identity a public page renders — name, bio, location, pronouns, socials — is fully writable by its owner and by nobody else. |
 | **UI** 🎨 | Profile fields, socials editor, live preview. |
@@ -350,8 +367,8 @@ console screen, not after: `AppShell` and `Guards` need a nested `/app` layout f
 
 ### R1.9 — Release 1 hardening ⏳
 
-- **Docs:** fix `README.md` — it still claims 94 tests, lists no `pages` route, and does
-  not mention this file.
+- **Docs:** ~~fix `README.md`~~ **Done** — it now reports 242 tests / 11 files, lists the
+  `/pages` and `/profile` routes, and points at this file. Keep it current as screens land.
 - **End to end:** one scripted pass against `wrangler dev` — signup → profile → avatar →
   address → links → autosave → publish → public page → share.
 - **Negative paths:** `409` reserved/taken slug, `422` bad input, `429` on every new
@@ -499,9 +516,9 @@ uses, which is the only way the `__Host-` cookie behaves at all.
 
 | Feature | Phase | What exists today |
 | --- | --- | --- |
-| Profile: name, bio | R1.1 | `PATCH /auth/me` does **not** exist |
-| Profile: location, pronouns | R1.2 | no columns |
-| Social links | R1.2 | no table |
+| Profile: name, bio | R1.1 | implemented: `PATCH /auth/me` |
+| Profile: location, pronouns | R1.2 | implemented: `users.location`/`users.pronouns` (0003) |
+| Social links | R1.2 | implemented: `user_social_links` + `/profile/socials` |
 | Avatar upload / crop | R1.3 | implemented: owned API, browser crop, replace/remove |
 | Page address + rename | R1.4 | slug immutable by design |
 | Link groups | R1.5 | no table |

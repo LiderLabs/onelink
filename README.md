@@ -117,7 +117,7 @@ normalized values, so the second submit diffs against what is actually stored.
 ## Tests and typecheck
 
 ```bash
-npm test          # 199 API tests in 10 files, run in workerd against local D1/R2
+npm test          # 242 API tests in 11 files, run in workerd against local D1/R2
 npm run typecheck # regenerates worker-configuration.d.ts, then typechecks both workspaces
 ```
 
