@@ -8,6 +8,7 @@ import { Button } from '../../components/Button'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Field, TextareaField } from '../../components/Field'
 import { Notice } from '../../components/Notice'
+import type { PreviewIdentity } from './ProfilePreview'
 
 // ============================================================================
 // Identity — the first section of `/app/profile` (R1.1, extended by R1.2).
@@ -135,9 +136,10 @@ export interface IdentityFormProps {
   /** A session that may read but not write: impersonated, forced rotation, suspended. */
   disabled: boolean
   navigationLocked: boolean
+  onPreviewChange?: (identity: PreviewIdentity) => void
 }
 
-export function IdentityForm({ user, disabled, navigationLocked }: IdentityFormProps) {
+export function IdentityForm({ user, disabled, navigationLocked, onPreviewChange }: IdentityFormProps) {
   const session = useSession()
 
   const baseline = useMemo(() => baselineOf(user), [user])
@@ -160,6 +162,7 @@ export function IdentityForm({ user, disabled, navigationLocked }: IdentityFormP
   }, [session.user, guard])
 
   const values = form.draft?.values ?? baseline
+  useEffect(() => { onPreviewChange?.(values) }, [values, onPreviewChange])
 
   const change = (key: keyof IdentityDraft, value: string) => {
     form.setValue(key, value)

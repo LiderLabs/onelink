@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { errorMessageFor, fieldErrorsFrom } from '../../lib/api'
 import { useResource } from '../../lib/use-resource'
@@ -11,12 +11,15 @@ import { Notice } from '../../components/Notice'
 import type { SocialLink, SocialPlatform } from '../../lib/types'
 import { socialsApi } from './api'
 import { SocialRow } from './SocialRow'
+import type { PreviewSocial, PreviewSocials } from './ProfilePreview'
 import {
   MAX_SOCIALS_PER_PROFILE,
   MAX_SOCIAL_URL_LENGTH,
   SOCIAL_PLATFORM_OPTIONS,
   platformLabel,
 } from './social-platforms'
+
+const NO_SOCIALS: SocialLink[] = []
 
 // ============================================================================
 // Social links — `/profile/socials` (R1.2).
@@ -44,9 +47,10 @@ export interface SocialsEditorProps {
   writable: boolean
   /** Why the section is empty when `readable` is false. Never rendered otherwise. */
   blockedReason: ReactNode
+  onPreviewChange?: (socials: PreviewSocials) => void
 }
 
-export function SocialsEditor({ readable, writable, blockedReason }: SocialsEditorProps) {
+export function SocialsEditor({ readable, writable, blockedReason, onPreviewChange }: SocialsEditorProps) {
   const socials = useResource(socialsApi.list, { enabled: readable })
 
   const [pending, setPending] = useState(false)
@@ -59,7 +63,31 @@ export function SocialsEditor({ readable, writable, blockedReason }: SocialsEdit
   const [url, setUrl] = useState('')
   const [visible, setVisible] = useState(true)
 
-  const list = socials.data?.socials ?? []
+  const list = socials.data?.socials ?? NO_SOCIALS
+  const [drafts, setDrafts] = useState<Record<string, Partial<PreviewSocial>>>({})
+  const [previewOrder, setPreviewOrder] = useState<string[] | null>(null)
+  const rowPreview = useCallback((id: string, draft: Partial<PreviewSocial> | null) => {
+    setDrafts(current => {
+      if (draft === null) {
+        if (!(id in current)) return current
+        const next = { ...current }; delete next[id]; return next
+      }
+      const previous = current[id]
+      if (previous && previous.platform === draft.platform && previous.url === draft.url && previous.isVisible === draft.isVisible) return current
+      return { ...current, [id]: draft }
+    })
+  }, [])
+  useEffect(() => { setPreviewOrder(null) }, [list])
+  const previewLinks = useMemo(() => {
+    if (!readable) return []
+    const ordered = previewOrder ? [...list].sort((a, b) => previewOrder.indexOf(a.id) - previewOrder.indexOf(b.id)) : list
+    const links: PreviewSocial[] = ordered.map(social => ({ ...social, ...drafts[social.id] }))
+    if (writable && url.trim() && list.length < MAX_SOCIALS_PER_PROFILE) links.push({ id: 'draft-new', platform: platform as SocialPlatform, url, position: links.length, isVisible: visible })
+    return links
+  }, [list, drafts, previewOrder, readable, writable, url, platform, visible])
+  useEffect(() => {
+    onPreviewChange?.({ links: previewLinks, loading: readable && socials.loading, unavailable: !readable || socials.error !== null })
+  }, [previewLinks, readable, socials.loading, socials.error, onPreviewChange])
   const atCap = list.length >= MAX_SOCIALS_PER_PROFILE
 
   const reset = () => {
@@ -117,6 +145,7 @@ export function SocialsEditor({ readable, writable, blockedReason }: SocialsEdit
     const [moved] = ids.splice(index, 1)
     if (moved === undefined) return
     ids.splice(target, 0, moved)
+    setPreviewOrder(ids)
 
     setError(null)
     setNotice(null)
@@ -126,6 +155,7 @@ export function SocialsEditor({ readable, writable, blockedReason }: SocialsEdit
       socials.reload()
       setNotice('Order saved.')
     } catch (caught) {
+      setPreviewOrder(null)
       setError(caught)
     } finally {
       setPending(false)
@@ -214,6 +244,7 @@ export function SocialsEditor({ readable, writable, blockedReason }: SocialsEdit
                   count={list.length}
                   writable={writable}
                   busy={pending}
+                  onPreviewChange={rowPreview}
                   onMove={(position, delta) => void move(position, delta)}
                   onDelete={setConfirming}
                   onSaved={(message) => {

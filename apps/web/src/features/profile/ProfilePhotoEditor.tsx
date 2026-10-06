@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { Button } from '../../components/Button'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -10,9 +10,11 @@ import { decodePhoto, encodeAvatar } from '../media/image'
 import { PhotoCropDialog } from '../media/PhotoCropDialog'
 import type { Crop, DecodedPhoto, MediaAsset } from '../media/types'
 import { ProfileAvatar } from './ProfileAvatar'
+import { initialCrop } from '../media/crop'
+import type { PreviewPhoto } from './ProfilePreview'
 
-export function ProfilePhotoEditor({ user, readable, writable, onBusyChange }: {
-  user: SessionUser; readable: boolean; writable: boolean; onBusyChange: (busy: boolean) => void
+export function ProfilePhotoEditor({ user, readable, writable, onBusyChange, onPreviewChange }: {
+  user: SessionUser; readable: boolean; writable: boolean; onBusyChange: (busy: boolean) => void; onPreviewChange?: (photo: PreviewPhoto | null) => void
 }) {
   const session = useSession()
   const input = useRef<HTMLInputElement>(null)
@@ -37,9 +39,10 @@ export function ProfilePhotoEditor({ user, readable, writable, onBusyChange }: {
     mounted.current = true
     return () => {
       mounted.current = false; generation.current++; uploadController.current?.abort()
+      onPreviewChange?.(null)
       image.current?.release(); image.current = null; onBusyChange(false)
     }
-  }, [onBusyChange])
+  }, [onBusyChange, onPreviewChange])
 
   useEffect(() => {
     let current = true
@@ -54,6 +57,7 @@ export function ProfilePhotoEditor({ user, readable, writable, onBusyChange }: {
     busy.current = value !== 'idle'; setPhase(value); onBusyChange(value !== 'idle')
   }
   const discard = () => {
+    onPreviewChange?.(null)
     generation.current++; image.current?.release(); image.current = null
     setPhoto(null); setError(null)
   }
@@ -80,10 +84,15 @@ export function ProfilePhotoEditor({ user, readable, writable, onBusyChange }: {
       const decoded = await decodePhoto(file)
       if (!mounted.current || token !== generation.current) { decoded.release(); return }
       image.current = decoded; setPhoto(decoded)
+      onPreviewChange?.({ photo: decoded, crop: initialCrop(decoded.width, decoded.height) })
     } catch (failure) {
       if (mounted.current && token === generation.current) setError(failure instanceof Error ? failure.message : 'Could not open that photo.')
     } finally { if (mounted.current && token === generation.current) setDecoding(false) }
   }
+
+  const previewCrop = useCallback((crop: Crop) => {
+    if (photo) onPreviewChange?.({ photo, crop })
+  }, [photo, onPreviewChange])
 
   const save = async (crop: Crop) => {
     if (!photo || !writable || busy.current || !loaded) return
@@ -178,7 +187,7 @@ export function ProfilePhotoEditor({ user, readable, writable, onBusyChange }: {
     {error && !photo ? <p className="photo-error" role="alert">{error}</p> : null}
     {notice ? <p className="profile-photo-message" role="status">{notice}</p> : null}
     {cleanup.length ? <div className="profile-photo-cleanup"><p>Your photo is up to date. An unused file still needs cleanup.</p><button type="button" disabled={!writable || phase !== 'idle'} onClick={() => { void retryCleanup() }}>Retry cleanup</button></div> : null}
-    {photo ? <PhotoCropDialog photo={photo} open pending={phase !== 'idle'} phase={phase} progress={progress} error={error} onSave={crop => { void save(crop) }} onCancel={() => { if (!busy.current) discard() }} /> : null}
+    {photo ? <PhotoCropDialog photo={photo} open pending={phase !== 'idle'} phase={phase} progress={progress} error={error} onCropChange={previewCrop} onSave={crop => { void save(crop) }} onCancel={() => { if (!busy.current) discard() }} /> : null}
     <ConfirmDialog open={removeOpen} title="Remove your profile photo?" confirmLabel="Remove photo" pending={phase !== 'idle'} onConfirm={() => { void remove() }} onCancel={() => setRemoveOpen(false)}>
       Your photo will be removed and your initials will appear in its place.
       {error && removeOpen ? <span className="photo-error" role="alert">{error}</span> : null}

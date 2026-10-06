@@ -12,9 +12,10 @@ export interface PhotoCropDialogProps {
   error: string | null
   onSave: (crop: Crop) => void
   onCancel: () => void
+  onCropChange?: (crop: Crop) => void
 }
 
-export function PhotoCropDialog({ photo, open, pending, phase, progress, error, onSave, onCancel }: PhotoCropDialogProps) {
+export function PhotoCropDialog({ photo, open, pending, phase, progress, error, onSave, onCancel, onCropChange }: PhotoCropDialogProps) {
   const id = useId()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -23,6 +24,7 @@ export function PhotoCropDialog({ photo, open, pending, phase, progress, error, 
   const saveStarted = useRef(false)
   const [crop, setCrop] = useState(() => initialCrop(photo.width, photo.height))
   const [zoom, setZoom] = useState(1)
+  useEffect(() => { onCropChange?.(crop) }, [crop, onCropChange])
   useEffect(() => {
     setCrop(initialCrop(photo.width, photo.height)); setZoom(1); saveStarted.current = false
   }, [photo])

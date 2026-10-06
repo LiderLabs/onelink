@@ -8,6 +8,8 @@ import { IdentityForm } from './IdentityForm'
 import { SocialsEditor } from './SocialsEditor'
 import { ProfilePhotoEditor } from './ProfilePhotoEditor'
 import { ProfileAvatar } from './ProfileAvatar'
+import { ProfilePreview } from './ProfilePreview'
+import type { PreviewIdentity, PreviewPhoto, PreviewSocials } from './ProfilePreview'
 import './profile.css'
 
 // Keep each section's existing resource and session guards together while
@@ -16,6 +18,9 @@ export function ProfileScreen() {
   const session = useSession()
   const user = session.user
   const [photoBusy, setPhotoBusy] = useState(false)
+  const [previewIdentity, setPreviewIdentity] = useState<PreviewIdentity | null>(null)
+  const [previewPhoto, setPreviewPhoto] = useState<PreviewPhoto | null>(null)
+  const [previewSocials, setPreviewSocials] = useState<PreviewSocials>({ links: [], loading: true, unavailable: false })
   useEffect(() => {
     const previous = document.title
     document.title = `Your profile · ${session.platformName}`
@@ -58,9 +63,9 @@ export function ProfileScreen() {
 
       <div className="profile-content">
         <div className="profile-editors">
-          <ProfilePhotoEditor user={user} readable={readable} writable={readable && !impersonated} onBusyChange={setPhotoBusy} />
-          <IdentityForm user={user} disabled={!usable || forced || impersonated} navigationLocked={photoBusy} />
-          <SocialsEditor readable={readable} writable={readable && !impersonated} blockedReason={blockedReason} />
+          <ProfilePhotoEditor user={user} readable={readable} writable={readable && !impersonated} onBusyChange={setPhotoBusy} onPreviewChange={setPreviewPhoto} />
+          <IdentityForm user={user} disabled={!usable || forced || impersonated} navigationLocked={photoBusy} onPreviewChange={setPreviewIdentity} />
+          <SocialsEditor readable={readable} writable={readable && !impersonated} blockedReason={blockedReason} onPreviewChange={setPreviewSocials} />
           <section className="profile-section profile-security" aria-labelledby="security">
             <div className="profile-section-heading">
               <div>
@@ -75,7 +80,8 @@ export function ProfileScreen() {
             <ChangePasswordForm forced={forced} />
           </section>
         </div>
-        <aside className="profile-summary" aria-label="Your account">
+        <aside className="profile-summary" aria-label="Profile preview and account">
+          <ProfilePreview identity={previewIdentity ?? user} avatarKey={user.avatarKey} photo={previewPhoto} socials={previewSocials} />
           <AccountRecord user={user} capabilities={session.capabilities} />
           <nav className="profile-jump-nav" aria-label="Profile sections">
             <p>On this page</p>
