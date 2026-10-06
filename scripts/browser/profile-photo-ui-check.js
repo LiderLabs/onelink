@@ -85,7 +85,9 @@ async page => {
   await page.evaluate(async()=>{
     const main=await(await fetch('/src/main.tsx')).text();const moduleUrl=name=>main.match(new RegExp('"(/node_modules/\\.vite/deps/'+name+'[^" ]*)"'))[1];
     const React=(await import(moduleUrl('react\\.js'))).default;const client=await import(moduleUrl('react-dom_client\\.js'));const {createRoot}=client.default??client;
-    const {SessionProvider,useSession}=await import('/src/lib/session.tsx');const {ProfilePhotoEditor}=await import('/src/features/profile/ProfilePhotoEditor.tsx');
+    const editorSource=await(await fetch('/src/features/profile/ProfilePhotoEditor.tsx')).text();
+    const sessionUrl=editorSource.match(/from "([^" ]*\/lib\/session\.tsx[^" ]*)"/)[1];
+    const {SessionProvider,useSession}=await import(sessionUrl);const {ProfilePhotoEditor}=await import('/src/features/profile/ProfilePhotoEditor.tsx');
     const host=document.createElement('div');host.id='unmount-check';document.body.append(host);const root=createRoot(host);
     const originalXHR=window.XMLHttpRequest,originalBitmap=window.createImageBitmap;
     window.__unmountTest={root,host,originalXHR,originalBitmap,sent:false,aborted:false,closed:false};
