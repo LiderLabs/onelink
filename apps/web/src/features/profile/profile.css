@@ -176,6 +176,14 @@
   align-items: start;
 }
 
+.profile-tab-panel[hidden] { display: none; }
+.profile-page-nav { border-bottom: 1px solid #e3e3df; margin-bottom: 2rem; }
+.profile-page-nav [role=tablist] { display: flex; gap: 2rem; }
+.profile-page-nav [role=tab] { padding: .9rem 0; margin-bottom: -1px; border-bottom: 2px solid transparent; color: #888; font-size: .85rem; cursor: pointer; }
+.profile-page-nav [role=tab][aria-selected=true] { border-color: #252525; color: #252525; }
+.profile-page-nav [role=tab]:focus-visible { outline: 2px solid #252525; outline-offset: 5px; }
+.profile-page-nav [role=tab]:disabled { cursor: wait; opacity: .55; }
+
 .profile-editors {
   min-width: 0;
 }

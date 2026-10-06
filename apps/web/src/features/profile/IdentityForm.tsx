@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { ChangeEvent, FormEvent } from 'react'
 import { ApiError, errorMessageFor, fieldErrorsFrom } from '../../lib/api'
 import { useDirtyForm, useUnsavedChanges } from '../../lib/dirty-form'
@@ -350,7 +351,7 @@ export function IdentityForm({ user, disabled, navigationLocked, onPreviewChange
         </div>
       </form>
 
-      <ConfirmDialog
+      {createPortal(<ConfirmDialog
         open={guard.blocked}
         pending={navigationLocked}
         title="Leave with unsaved identity changes?"
@@ -361,7 +362,7 @@ export function IdentityForm({ user, disabled, navigationLocked, onPreviewChange
       >
         Your edits have not been saved. Leaving now discards them; the account still holds the
         values shown before you started typing.
-      </ConfirmDialog>
+      </ConfirmDialog>, document.body)}
     </section>
   )
 }

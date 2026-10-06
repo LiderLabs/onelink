@@ -1,13 +1,14 @@
 async page => {
   await page.unrouteAll({behavior:'ignoreErrors'});await page.reload();
   const check=(condition,message)=>{if(!condition)throw new Error(message)};
+  const socials=page.getByRole('tab',{name:'Socials',exact:true});await socials.click();
   const preview=page.getByRole('region',{name:'Live profile preview',exact:true});await preview.waitFor();
   const ids=[];
   try {
     for(const [platform,url] of [['website','https://example.com/preview-fixture'],['github','https://github.com/preview-fixture']]){
       const id=await page.evaluate(async body=>{const response=await fetch('/api/v1/profile/socials',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!response.ok)throw new Error('Fixture creation failed '+response.status);return(await response.json()).data.id},{platform,url});ids.push(id);
     }
-    await page.reload();await preview.getByRole('link',{name:'GitHub',exact:true}).waitFor();
+    await page.reload();await socials.click();await preview.getByRole('link',{name:'GitHub',exact:true}).waitFor();
     const row=page.locator('.profile-social-row').filter({has:page.getByRole('link',{name:'https://github.com/preview-fixture',exact:true})});
     await row.getByRole('button',{name:'Edit the GitHub link',exact:true}).click();
     const editing=page.locator('.profile-social-row.is-editing');
@@ -27,7 +28,7 @@ async page => {
     check(JSON.stringify(await labels())===JSON.stringify(initial),'rejected reorder restores saved preview order');await page.unroute('**/api/v1/profile/socials/order');
     await row.getByRole('button',{name:'Move the GitHub link up',exact:true}).click();await page.getByText('Order saved.',{exact:true}).waitFor();
     await page.waitForFunction(()=>document.querySelector('.profile-preview-links a')?.textContent.includes('GitHub'));
-    await page.reload();await preview.getByRole('link',{name:'GitHub',exact:true}).waitFor();check((await labels())[0].includes('GitHub'),'saved order survives reload');
+    await page.reload();await socials.click();await preview.getByRole('link',{name:'GitHub',exact:true}).waitFor();check((await labels())[0].includes('GitHub'),'saved order survives reload');
     return {passed:['existing social drafts','hidden drafts omitted','cancel restores saved social','immediate reorder preview','failed reorder rollback','saved order reload']};
   } finally {
     await page.unrouteAll({behavior:'ignoreErrors'});

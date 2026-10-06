@@ -134,11 +134,15 @@ uploads a 512 × 512 WebP capped at 240 KiB. Cancel sends no upload. Replacement
 and confirmed removal clean up the previous photo. Unsaved profile text survives
 photo operations. Failed file cleanup has a separate retry control.
 
+The profile page has two tabs. **Profile** contains the photo, profile details,
+security, and session details. **Socials** contains social links and the live
+preview. Switching tabs preserves unsaved drafts.
+
 The editor's live profile preview follows unsaved name, username, bio,
 location/pronouns, photo crop, and social-link drafts. Hidden socials are omitted;
 cancel/undo restores the saved view. Reordering previews immediately and rolls
 back on rejection. Preview updates do not issue save requests. On mobile the
-preview appears above the editor; desktop keeps it in the side panel.
+preview appears above the Socials editor; desktop keeps it in the side panel.
 
 `POST /api/v1/media?kind=avatar` accepts raw WebP, `GET /api/v1/media/avatar`
 returns current metadata, and `DELETE /api/v1/media/:id` retires owned avatars.
@@ -159,6 +163,7 @@ npx @playwright/cli run-code --filename=scripts/browser/profile-photo-state-chec
 npx @playwright/cli run-code --filename=scripts/browser/profile-photo-response-check.js
 npx @playwright/cli run-code --filename=scripts/browser/profile-preview-check.js
 npx @playwright/cli run-code --filename=scripts/browser/profile-preview-social-check.js
+npx @playwright/cli run-code --filename=scripts/browser/profile-tabs-check.js
 ```
 
 The flow check creates a disposable local account used by the UI check.

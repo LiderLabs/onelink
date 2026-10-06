@@ -36,6 +36,10 @@ export function ProfilePhotoEditor({ user, readable, writable, onBusyChange, onP
   const [removeOpen, setRemoveOpen] = useState(false)
 
   useEffect(() => {
+    onBusyChange(decoding || phase !== 'idle')
+  }, [decoding, phase, onBusyChange])
+
+  useEffect(() => {
     mounted.current = true
     return () => {
       mounted.current = false; generation.current++; uploadController.current?.abort()
@@ -54,7 +58,7 @@ export function ProfilePhotoEditor({ user, readable, writable, onBusyChange, onP
   }, [user.id, user.avatarKey, readable])
 
   const changePhase = (value: typeof phase) => {
-    busy.current = value !== 'idle'; setPhase(value); onBusyChange(value !== 'idle')
+    busy.current = value !== 'idle'; setPhase(value)
   }
   const discard = () => {
     onPreviewChange?.(null)
