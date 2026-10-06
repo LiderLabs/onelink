@@ -207,6 +207,8 @@ authRoutes.patch(
         location: body.location,
         pronouns: body.pronouns,
         username: body.username,
+        avatarKey: body.avatarKey,
+        expectedAvatarKey: body.expectedAvatarKey,
       },
       c.get('auditor'),
     )

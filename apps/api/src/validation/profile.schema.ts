@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { AVATAR_KEY_PATTERN } from '../lib/media'
 import {
   MAX_BIO_LENGTH,
   MAX_DISPLAY_NAME_LENGTH,
@@ -79,12 +80,14 @@ export const updateProfileSchema = z
     location: locationSchema.nullable().optional(),
     pronouns: pronounsSchema.nullable().optional(),
     username: usernameSchema.optional(),
-    // R1.2 added `location` and `pronouns` above, exactly as R1.1 promised.
-    // R1.3 lands `avatarKey`, which must be checked against `media_assets`
-    // ownership in the service before it is ever trusted.
+    avatarKey: z.string().max(240).regex(AVATAR_KEY_PATTERN, 'Invalid profile photo key.').nullable().optional(),
+    expectedAvatarKey: z.string().max(240).nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     error: 'Supply at least one field to update.',
+  })
+  .refine(value => (value.avatarKey !== undefined) === (value.expectedAvatarKey !== undefined), {
+    error: 'A profile photo change requires its current photo key.', path: ['avatarKey'],
   })
 
 export type UpdateProfileBody = z.infer<typeof updateProfileSchema>

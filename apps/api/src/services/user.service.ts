@@ -540,6 +540,8 @@ export interface UpdateProfileInput {
   location?: string | null | undefined
   pronouns?: string | null | undefined
   username?: string | undefined
+  avatarKey?: string | null | undefined
+  expectedAvatarKey?: string | null | undefined
 }
 
 /**
@@ -573,6 +575,17 @@ export async function updateOwnProfile(
 ): Promise<ApiUser> {
   const target = await requireUserById(db, actor.id)
 
+  const avatarChange = input.avatarKey !== undefined
+  if (avatarChange) {
+    if (input.expectedAvatarKey === undefined) throw badRequest('Supply the current profile photo key.')
+    if (input.avatarKey !== null) {
+      const asset = await db.prepare("SELECT id FROM media_assets WHERE r2_key=? AND owner_user_id=? AND status='active' AND bucket='public' AND kind='avatar'")
+        .bind(input.avatarKey, actor.id).first()
+      if (!asset) throw notFound('Photo')
+    }
+    if (target.avatar_key !== input.expectedAvatarKey) throw conflict('Your profile photo changed. Reload it and try again.')
+  }
+
   const patch: string[] = []
   const binds: unknown[] = []
   const before: Record<string, unknown> = {}
@@ -592,6 +605,7 @@ export async function updateOwnProfile(
     if (displayName.length === 0) throw badRequest('A display name is required.')
     setField('display_name', displayName, 'displayName')
   }
+  if (avatarChange) setField('avatar_key', input.avatarKey, 'avatarKey')
   if (input.bio !== undefined) {
     // `""` and `null` both mean "clear it" — the column is nullable and that is
     // what an emptied textarea sends.
@@ -642,13 +656,17 @@ export async function updateOwnProfile(
     after,
   })
 
-  await db.batch([
-    db
-      .prepare(`UPDATE users SET ${patch.join(', ')}, updated_at = ? WHERE id = ?`)
-      .bind(...binds, timestamp, target.id),
-    auditInsertStmt(db, entry),
+  const eligibility = avatarChange && input.avatarKey !== null
+    ? " AND EXISTS (SELECT 1 FROM media_assets WHERE r2_key=? AND owner_user_id=? AND status='active' AND kind='avatar' AND bucket='public')" : ''
+  const results = await db.batch([
+    db.prepare(`UPDATE users SET ${patch.join(', ')}, updated_at = ? WHERE id = ?${avatarChange ? ' AND avatar_key IS ?' : ''}${eligibility}`)
+      .bind(...binds, timestamp, target.id, ...(avatarChange ? [input.expectedAvatarKey] : []), ...(eligibility ? [input.avatarKey, target.id] : [])),
+    auditInsertStmt(db, entry, avatarChange),
   ])
-
+  if (avatarChange && results[0]?.meta.changes !== 1) {
+    await auditInsertStmt(db, { ...entry, status: 'denied', after: null }).run()
+    throw conflict('Your profile photo changed. Reload it and try again.')
+  }
   return toApiUser(await requireUserById(db, target.id))
 }
 

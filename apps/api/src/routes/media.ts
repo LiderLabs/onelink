@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
-import { ok } from '../lib/http'
+import { ok, noContent } from '../lib/http'
 import { validationError } from '../lib/errors'
 import { requireActiveAccount, requirePasswordSettled, requireUnimpersonated } from '../middleware/auth'
 import { rateLimit } from '../middleware/rate-limit'
 import { actorInfoOf } from '../services/user.service'
-import { getCurrentAvatar, readPublicAvatar, uploadAvatar } from '../services/media.service'
+import { deleteOwnedAvatar, getCurrentAvatar, readPublicAvatar, uploadAvatar } from '../services/media.service'
 import type { AppEnv } from '../types'
 import { currentUser } from './helpers'
 
@@ -20,6 +20,11 @@ mediaRoutes.post('/', requireActiveAccount, requirePasswordSettled, requireUnimp
 
 mediaRoutes.get('/avatar', requireActiveAccount, requirePasswordSettled, async c =>
   ok(c, { media: await getCurrentAvatar(c.env.DB, currentUser(c).id) }))
+
+mediaRoutes.delete('/:id', requireActiveAccount, requirePasswordSettled, requireUnimpersonated, async c => {
+  await deleteOwnedAvatar(c.env, actorInfoOf(currentUser(c)), c.req.param('id'), c.get('auditor'))
+  return noContent(c)
+})
 
 mediaRoutes.get('/files/avatars/:ownerId/:filename', async c => {
   const object = await readPublicAvatar(c.env, `avatars/${c.req.param('ownerId')}/${c.req.param('filename')}`)

@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { env } from 'cloudflare:workers'
 import { avatarWebp } from './fixtures/media'
 import { api, rawApi, createTestUser, loginAs, impersonatedCookieFor, resetIsolateCaches, type Envelope, type ErrorEnvelope } from './helpers'
-import { uploadAvatar } from '../src/services/media.service'
+import { uploadAvatar, deleteOwnedAvatar } from '../src/services/media.service'
+import { updateOwnProfile } from '../src/services/user.service'
 import { standaloneEntry } from '../src/services/audit.service'
 import type { Auditor, MediaDto } from '../src/types'
 
@@ -81,5 +82,82 @@ describe('avatar upload and public serving', () => {
       expect(log).toHaveBeenCalledWith(expect.stringContaining('media_upload_compensation_failed'))
       expect(log).toHaveBeenCalledWith(expect.stringContaining('media-test-request'))
     }finally{log.mockRestore()}
+  })
+})
+
+describe('avatar attachment and deletion',()=>{
+  const attach=(cookie:string,avatarKey:string|null,expectedAvatarKey:string|null)=>api<Envelope<{user:{avatarKey:string|null}}>>('PATCH','/api/v1/auth/me',{cookie,body:{avatarKey,expectedAvatarKey}})
+  it('attaches owned media, reads metadata, clears with null, and preserves identity-only writes',async()=>{
+    const cookie=await loginAs(await createTestUser()), media=await assetOf(await upload(cookie))
+    expect((await attach(cookie,media.key,null)).body.data.user.avatarKey).toBe(media.key)
+    expect((await api<Envelope<{media:MediaDto}>>('GET','/api/v1/media/avatar',{cookie})).body.data.media.id).toBe(media.id)
+    expect((await api<Envelope<{user:{avatarKey:string}}>>('PATCH','/api/v1/auth/me',{cookie,body:{bio:'Photo stays'}})).body.data.user.avatarKey).toBe(media.key)
+    expect((await attach(cookie,null,media.key)).body.data.user.avatarKey).toBeNull()
+  })
+  it('rejects missing and standalone preconditions; stale changes have no success audit',async()=>{
+    const cookie=await loginAs(await createTestUser()), media=await assetOf(await upload(cookie))
+    expect((await api('PATCH','/api/v1/auth/me',{cookie,body:{avatarKey:media.key}})).status).toBe(422)
+    expect((await api('PATCH','/api/v1/auth/me',{cookie,body:{expectedAvatarKey:null,bio:'No'}})).status).toBe(422)
+    expect((await attach(cookie,media.key,null)).status).toBe(200)
+    const stale=await attach(cookie,null,null);expect(stale.status).toBe(409)
+    const row=await env.DB.prepare("SELECT count(*) AS n FROM audit_logs WHERE request_id=? AND status='success'").bind(stale.headers.get('x-request-id')).first<{n:number}>()
+    expect(row?.n).toBe(0)
+  })
+  it('refuses foreign, unknown, deleted, private and wrong-kind assets',async()=>{
+    const cookie=await loginAs(await createTestUser()), other=await loginAs(await createTestUser())
+    const foreign=await assetOf(await upload(other))
+    expect((await attach(cookie,foreign.key,null)).status).toBe(404)
+    expect((await attach(cookie,'avatars/unknown/01ARZ3NDEKTSV4RRFFQ69G5FAV.webp',null)).status).toBe(404)
+    for(const patch of ["status='deleted'","bucket='private'","kind='page_image'"]){
+      const media=await assetOf(await upload(cookie));await env.DB.prepare(`UPDATE media_assets SET ${patch} WHERE id=?`).bind(media.id).run()
+      expect((await attach(cookie,media.key,null)).status).toBe(404)
+    }
+  })
+  it('deletes object and row, clears only a matching pointer, and is idempotent',async()=>{
+    const cookie=await loginAs(await createTestUser()), old=await assetOf(await upload(cookie)), next=await assetOf(await upload(cookie))
+    await attach(cookie,old.key,null);await attach(cookie,next.key,old.key)
+    expect((await api('DELETE',`/api/v1/media/${old.id}`,{cookie})).status).toBe(204)
+    expect((await env.PUBLIC_BUCKET.get(old.key))).toBeNull()
+    expect((await rawApi('GET',old.url)).status).toBe(404)
+    expect((await api<Envelope<{user:{avatarKey:string}}>>('GET','/api/v1/auth/me',{cookie})).body.data.user.avatarKey).toBe(next.key)
+    expect((await api('DELETE',`/api/v1/media/${next.id}`,{cookie})).status).toBe(204)
+    expect((await api<Envelope<{user:{avatarKey:null}}>>('GET','/api/v1/auth/me',{cookie})).body.data.user.avatarKey).toBeNull()
+    expect((await api('DELETE',`/api/v1/media/${next.id}`,{cookie})).status).toBe(204)
+    expect(await env.DB.prepare('SELECT id FROM media_assets WHERE id=?').bind(next.id).first()).toBeNull()
+  })
+  it('does not delete or disclose existing foreign assets',async()=>{
+    const owner=await loginAs(await createTestUser()), other=await loginAs(await createTestUser()), media=await assetOf(await upload(owner))
+    expect((await api('DELETE',`/api/v1/media/${media.id}`,{cookie:other})).status).toBe(404)
+    expect(await env.PUBLIC_BUCKET.get(media.key)).not.toBeNull()
+    expect((await api('DELETE',`/api/v1/media/${media.id}`)).status).toBe(401)
+  })
+  it('retains a marked row after storage failure, refuses attachment, and retries deletion',async()=>{
+    const user=await createTestUser(), cookie=await loginAs(user), media=await assetOf(await upload(cookie))
+    await attach(cookie,media.key,null)
+    const failedBucket=new Proxy(env.PUBLIC_BUCKET,{get(target,key){if(key==='delete')return async()=>{throw new Error('storage unavailable')};const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value}})
+    const actor={id:user.id,role:user.role,label:user.username}
+    await expect(deleteOwnedAvatar({...env,PUBLIC_BUCKET:failedBucket},actor,media.id,auditor())).rejects.toThrow('storage unavailable')
+    expect((await env.DB.prepare('SELECT status FROM media_assets WHERE id=?').bind(media.id).first<{status:string}>())?.status).toBe('deleted')
+    expect((await rawApi('GET',media.url)).status).toBe(404)
+    expect((await attach(cookie,media.key,null)).status).toBe(404)
+    await deleteOwnedAvatar(env,actor,media.id,auditor())
+    expect(await env.PUBLIC_BUCKET.get(media.key)).toBeNull()
+  })
+  it('permits one winner when two attachments race with the same precondition',async()=>{
+    const user=await createTestUser(), cookie=await loginAs(user), first=await assetOf(await upload(cookie)), second=await assetOf(await upload(cookie))
+    const result=await Promise.all([attach(cookie,first.key,null),attach(cookie,second.key,null)])
+    expect(result.map(r=>r.status).sort()).toEqual([200,409])
+    const row=await env.DB.prepare("SELECT count(*) AS n FROM audit_logs WHERE action='user.profile_update' AND status='success'").first<{n:number}>()
+    expect(row?.n).toBe(1)
+  })
+  it('does not attach an asset deleted between validation and the atomic update',async()=>{
+    const user=await createTestUser(), cookie=await loginAs(user), media=await assetOf(await upload(cookie))
+    let interleaved=false
+    const racedDb=new Proxy(env.DB,{get(target,key){if(key==='batch')return async(statements:D1PreparedStatement[])=>{
+      if(!interleaved){interleaved=true;await env.DB.prepare("UPDATE media_assets SET status='deleted' WHERE id=?").bind(media.id).run()}
+      return target.batch(statements)
+    };const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value}})
+    await expect(updateOwnProfile(racedDb,{id:user.id,role:user.role,label:user.username},{avatarKey:media.key,expectedAvatarKey:null},auditor())).rejects.toMatchObject({status:409})
+    expect((await env.DB.prepare('SELECT avatar_key FROM users WHERE id=?').bind(user.id).first<{avatar_key:null}>())?.avatar_key).toBeNull()
   })
 })

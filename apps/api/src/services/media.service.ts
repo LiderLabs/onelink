@@ -3,7 +3,7 @@ import { ulid } from '../lib/ids'
 import { notFound } from '../lib/errors'
 import { AVATAR_KEY_PATTERN, mediaUrl, validateAvatarWebp } from '../lib/media'
 import { auditInsertStmt } from './audit.service'
-import type { ActorInfo, Auditor, MediaAssetRow, MediaDto } from '../types'
+import type { ActorInfo, Auditor, AuditEntry, MediaAssetRow, MediaDto } from '../types'
 
 export function toMediaDto(row: MediaAssetRow): MediaDto {
   return { id: row.id, key: row.r2_key, url: mediaUrl(row.r2_key), width: row.width!, height: row.height!, bytes: row.size_bytes }
@@ -49,4 +49,30 @@ export async function readPublicAvatar(env: Cloudflare.Env, key: string): Promis
   const object = await env.PUBLIC_BUCKET.get(key)
   if (!object) throw notFound('Photo')
   return object
+}
+
+/** Mark before deleting storage; a tombstone remains until storage cleanup succeeds. */
+export async function retireAvatar(env: Cloudflare.Env, row: MediaAssetRow, entry: AuditEntry, onlyIfUnattached = false): Promise<boolean> {
+  const timestamp = now()
+  const results = await env.DB.batch([
+    env.DB.prepare(`UPDATE media_assets SET status='deleted', deleted_at=coalesce(deleted_at,?) WHERE id=?
+      ${onlyIfUnattached ? 'AND NOT EXISTS (SELECT 1 FROM users WHERE avatar_key=media_assets.r2_key)' : ''}`)
+      .bind(timestamp, row.id),
+    auditInsertStmt(env.DB, entry, true),
+    env.DB.prepare(`UPDATE users SET avatar_key=NULL,updated_at=? WHERE avatar_key=?
+      AND EXISTS (SELECT 1 FROM media_assets WHERE id=? AND status='deleted')`)
+      .bind(timestamp, row.r2_key, row.id),
+  ])
+  if (results[0]?.meta.changes !== 1) return false
+  await env.PUBLIC_BUCKET.delete(row.r2_key)
+  await env.DB.prepare("DELETE FROM media_assets WHERE id=? AND status='deleted'").bind(row.id).run()
+  return true
+}
+
+export async function deleteOwnedAvatar(env: Cloudflare.Env, actor: ActorInfo, id: string, auditor: Auditor): Promise<void> {
+  const row = await env.DB.prepare('SELECT * FROM media_assets WHERE id=?').bind(id).first<MediaAssetRow>()
+  if (!row) return
+  if (row.owner_user_id !== actor.id || row.kind !== 'avatar' || row.bucket !== 'public') throw notFound('Photo')
+  const entry = auditor.claim({ action: 'media.delete', targetType: 'media', targetId: id, before: { key: row.r2_key }, after: { status: 'deleted' } })
+  await retireAvatar(env, row, entry)
 }
