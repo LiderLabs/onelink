@@ -22,6 +22,7 @@ import { mediaRoutes } from './routes/media'
 import { userRoutes } from './routes/users'
 import { settingsRoutes } from './routes/settings'
 import { auditRoutes } from './routes/audit'
+import { pageInvitationRoutes, pageMemberRoutes } from './routes/page-members'
 import type { AppEnv } from './types'
 
 // ============================================================================
@@ -110,6 +111,8 @@ export function createApp() {
   app.route('/api/v1/public', publicRoutes)
   app.route('/api/v1/auth', authRoutes)
   app.route('/api/v1/pages', pageRoutes)
+  app.route('/api/v1/pages', pageMemberRoutes)
+  app.route('/api/v1/page-invitations', pageInvitationRoutes)
   app.route('/api/v1/profile', profileRoutes)
   // R1.3. Deliberately NOT under /admin: an avatar is a self-service object, so
   // this is mounted beside `/profile` and guarded by ownership rather than by a

@@ -12,7 +12,7 @@ import { Notice } from '../../components/Notice'
 import type { PreviewIdentity } from './ProfilePreview'
 
 // ============================================================================
-// Identity — the first section of `/app/profile` (R1.1, extended by R1.2).
+// Identity — the dashboard profile section (R1.1, extended by R1.2).
 //
 // The contract, read from `PATCH /auth/me`, `updateOwnProfile` and
 // `lib/constants.ts`:
@@ -163,7 +163,7 @@ export function IdentityForm({ user, disabled, navigationLocked, onPreviewChange
   const baseline = useMemo(() => baselineOf(user), [user])
   const form = useDirtyForm<IdentityDraft>(baseline)
   const guard = useUnsavedChanges((form.dirty && !disabled) || navigationLocked,
-    navigationLocked ? [] : ['/app/profile', '/app/socials'])
+    navigationLocked ? [] : ['/app'])
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [banner, setBanner] = useState<string | null>(null)
@@ -282,7 +282,7 @@ export function IdentityForm({ user, disabled, navigationLocked, onPreviewChange
             delay={1}
             maxLength={DISPLAY_NAME_MAX}
             disabled={disabled}
-            hint="The name people will see."
+            hint={`${values.displayName.length}/${DISPLAY_NAME_MAX} characters. The name people will see.`}
             error={fieldErrors.displayName ?? null}
             value={values.displayName}
             onChange={field('displayName')}

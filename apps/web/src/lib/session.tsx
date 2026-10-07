@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ApiError, api, isUnauthenticated } from './api'
+import { ApiError, api, isUnauthenticated, SESSION_EXPIRED_EVENT } from './api'
 import type { PublicSettings, SessionUser, UpdateProfileInput } from './types'
 
 // ============================================================================
@@ -140,6 +140,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void load()
   }, [load])
 
+  const expireSession = useCallback(() => {
+    loadIdRef.current += 1
+    setState((previous) => ({
+      status: 'anonymous',
+      user: null,
+      capabilities: [],
+      platformName: previous.platformName,
+      settings: previous.settings,
+      bootstrapError: null,
+    }))
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener(SESSION_EXPIRED_EVENT, expireSession)
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, expireSession)
+  }, [expireSession])
+
   /**
    * Runs an authenticated call and, if the API reports the session is gone,
    * drops local identity too. Sessions have a hard 8-hour ceiling, so without
@@ -149,20 +166,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     try {
       return await action()
     } catch (error) {
-      if (isUnauthenticated(error)) {
-        loadIdRef.current += 1
-        setState((previous) => ({
-          status: 'anonymous',
-          user: null,
-          capabilities: [],
-          platformName: previous.platformName,
-          settings: previous.settings,
-          bootstrapError: null,
-        }))
-      }
+      if (isUnauthenticated(error)) expireSession()
       throw error
     }
-  }, [])
+  }, [expireSession])
 
   /**
    * Adopts an /auth/login or /auth/register response directly, so the next paint

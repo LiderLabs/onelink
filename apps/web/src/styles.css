@@ -18,14 +18,17 @@
    `font-display` etc. are generated from one source of truth.
    ========================================================================== */
 @theme {
-  --color-paper: #ffffff;
-  --color-paper-deep: #f1f1f1;
-  --color-card: #ffffff;
-  --color-ink: #000000;
-  --color-ink-soft: #3f3f3f;
-  --color-ink-faint: #6f6f6f;
-  --color-rule: #d6d6d6;
-  --color-danger: #c1121f;
+  --color-paper: #f7f7f4;
+  --color-paper-deep: #f1f1ee;
+  --color-card: rgba(255, 255, 255, 0.96);
+  --color-ink: #111111;
+  --color-ink-soft: #4b4b49;
+  --color-ink-faint: #767572;
+  --color-rule: rgba(17, 17, 17, 0.12);
+  --color-danger: #c92f3d;
+  --color-accent: #111111;
+  --color-accent-soft: rgba(17, 17, 17, 0.08);
+  --color-success: #1d6b4f;
 
   --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
   --font-sans: 'Archivo', ui-sans-serif, system-ui, sans-serif;
@@ -44,35 +47,67 @@
     font-family: var(--font-sans);
     font-feature-settings: 'ss01' 1;
     min-height: 100vh;
-    /* One neutral wash so large empty areas are not flat colour. */
-    background-image: radial-gradient(120% 80% at 100% 0%, rgba(0, 0, 0, 0.035), transparent 60%);
+    background-image: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(247,247,244,0.98));
     background-attachment: fixed;
   }
 
   ::selection {
-    background: var(--color-ink);
-    color: var(--color-paper);
+    background: rgba(17, 17, 17, 0.14);
+    color: var(--color-ink);
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-ink);
+    outline: 2px solid rgba(17, 17, 17, 0.9);
     outline-offset: 2px;
-    border-radius: 1px;
-  }
-
-  /* Print grain. Decorative only, so it is excluded from hit-testing and from
-     the accessibility tree entirely. */
-  body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    z-index: 60;
-    pointer-events: none;
-    mix-blend-mode: multiply;
-    opacity: 0.4;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.32'/%3E%3C/svg%3E");
+    border-radius: 0.5rem;
   }
 }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+
+.stamp {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--color-ink);
+  border-radius: 999px;
+  color: var(--color-ink);
+  background: rgba(17, 17, 17, 0.03);
+}
+
+.plate {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--color-rule);
+  box-shadow: 0 10px 28px -20px rgba(17, 17, 17, 0.25);
+}
+
+.auth-shell {
+  min-height: 100dvh;
+  color: #111111;
+  background: #f7f7f4;
+}
+
+.console-page {
+  position: relative;
+}
+
+.console-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(17, 17, 17, 0.02), transparent 28%);
+  pointer-events: none;
+}
+
 
 /* ------------------------------------------------------------- ornaments -- */
 

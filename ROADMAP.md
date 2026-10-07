@@ -9,8 +9,8 @@ phase names the files it touches, the migration it adds, the tests that must cov
 and the criteria that say "done". Where something does not exist yet, this file says
 so plainly rather than assuming it.
 
-Verified against commit `1e5db86` (`feat(api): owner-facing pages and links API`), with
-§1.1, §1.6 and §1.8 refreshed to the tree after R1.3.
+Verified against the working tree after R2.1 (2026-10-07). Release 1 is complete and
+the R2.1 teams API is implemented; the next API phase is R2.2 (custom domains).
 
 ## How to read this
 
@@ -27,11 +27,13 @@ Status markers: ✅ done · 🔨 next · ⏳ planned · 🎨 UI (deferred) · �
 > **UI sequencing is planned separately.** `UI-ROADMAP.md` splits the single R1.8 UI pass
 > into user-facing phases that land beside the API phase each one consumes, and leaves the
 > staff console out. It supersedes the single-pass reading of **S2** *for user-facing
-> screens only*: U0 (the `/app` namespace, i.e. **S3**) and U1 (`/app/profile`) are now
-> implemented ahead of R1.3. **S2** still governs the staff console.
+> screens only*: U0 (the `/app` namespace, i.e. **S3**) and U1 (profile/social editor)
+> are implemented ahead of R1.3; profile and social editing currently live on `/app`.
+> **S2** still governs the staff console.
 > **Owner split:** the UI stream is handed to a second owner working from `UI-ROADMAP.md`
-> §0 (what is built, what is left); this file continues the API stream, R1.3 next. The two
-> meet at the phases U5–U9, each of which is blocked on one API phase.
+> §0 (what is built, what is left); this file continues the API stream, R2.2 next. The two
+> streams met at U5–U9; their API dependencies are complete, with the remaining UI work
+> tracked separately.
 
 **Ground rules → §7.** The three that bite hardest:
 
@@ -52,24 +54,19 @@ Status markers: ✅ done · 🔨 next · ⏳ planned · 🎨 UI (deferred) · �
 | Admin users: list, detail, create, invite, sanction, suspend, ban, notes, sessions, revoke, password reset | `src/routes/users.ts` | ✅ |
 | Settings, audit log (+ export), health | `src/routes/{settings,audit,health}.ts` | ✅ |
 | Public: settings, page read | `src/routes/public.ts` | ✅ |
-| Owner pages & links | `src/routes/pages.ts` | ✅ |
+| Owner pages, links & team access | `src/routes/{pages,page-members}.ts` | ✅ |
 | Profile & socials | `src/routes/profile.ts` | ✅ |
 | Media / avatars | `src/routes/media.ts` | ✅ |
 
-`pages.ts` exposes exactly 11 routes:
+`pages.ts` exposes 28 routes, including the draft, history, preview, groups, trash and bulk surfaces:
 
 ```
-GET    /api/v1/pages/mine
-GET    /api/v1/pages/:id
-POST   /api/v1/pages
-PATCH  /api/v1/pages/:id
-POST   /api/v1/pages/:id/publish
-POST   /api/v1/pages/:id/unpublish
-DELETE /api/v1/pages/:id
-POST   /api/v1/pages/:id/links
-PATCH  /api/v1/pages/:id/links/:linkId
-PUT    /api/v1/pages/:id/links/order
-DELETE /api/v1/pages/:id/links/:linkId
+GET/PUT /api/v1/pages/:id/draft
+POST    /api/v1/pages/:id/draft/discard
+GET     /api/v1/pages/:id/revisions[/:revision]
+POST    /api/v1/pages/:id/revisions/:revision/restore
+GET     /api/v1/pages/:id/preview
+POST    /api/v1/pages/:id/publish
 ```
 
 Every mutation composes `writeLimit → requireActiveAccount → requirePasswordSettled →
@@ -86,13 +83,15 @@ redirecting to `/profile`. **There is no pages dashboard yet** — that is Relea
 
 Migrations are `apps/api/migrations/0001_init.sql` (identity, sessions, moderation,
 pages, links, revisions, slug reservations, media, reports/appeals/flags, audit,
-settings, email templates, rate limits) and `0002_pages_theme_and_scheduling.sql`
-(adds page theme/layout/accent/branding, link `description`, link `starts_at`/
-`ends_at`). Both are additive-only and STRICT.
+settings, email templates, rate limits), `0002_pages_theme_and_scheduling.sql`
+(page theme/layout/accent/branding, link `description`, `starts_at`/`ends_at`),
+`0003_profile_fields.sql`, `0004_link_groups_and_thumbnails.sql`, and
+`0005_page_drafts.sql`. They are additive-only; the initial schema and new tables are STRICT.
 
 Tables with **no route or service touching them yet**: `reports`,
 `appeals`, `content_flags`, `report_actions`, `invitations` (staff-shaped only).
-`slug_reservations` is used, but only internally.
+`slug_reservations` is used, but only internally. R2.1 adds page-scoped
+`page_members` and `page_invitations`.
 
 ### 1.4 Dead columns (verified, not assumed)
 
@@ -128,7 +127,7 @@ Constants in `src/lib/constants.ts`: `MAX_SLUG_LENGTH = 48`, `MAX_URL_LENGTH = 2
 ### 1.6 Seeded policy (`apps/api/seed/0001_platform-defaults.sql`)
 
 17 seeded settings rows (16 of them named in `SETTING_KEYS`,
-`src/services/settings.service.ts`), 8 email templates, 8 rate limits. Relevant here:
+`src/services/settings.service.ts`), 8 email templates, 9 rate limits. Relevant here:
 
 - Settings: `platform.pages_base_url`, `platform.registration_open`,
   `platform.maintenance_mode`, `content.max_links_per_page` (50),
@@ -158,10 +157,12 @@ Constants in `src/lib/constants.ts`: `MAX_SLUG_LENGTH = 48`, `MAX_URL_LENGTH = 2
 
 ### 1.8 Test suites
 
-`apps/api/test/`: `auth.spec.ts`, `pages.api.spec.ts`, `profile.api.spec.ts`,
+`apps/api/test/`: `auth.spec.ts`, `pages.api.spec.ts`, `drafts.api.spec.ts`,
+`public.api.spec.ts`, `links.api.spec.ts`,
+`link-metadata.spec.ts`, `profile.api.spec.ts`,
 `socials.api.spec.ts`, `avatar.api.spec.ts`, `media.api.spec.ts`,
 `media.maintenance.spec.ts`, `media.validation.spec.ts`, `signup.spec.ts`,
-`unit.lib.spec.ts`, `users.admin.spec.ts` — **242 tests across eleven**, run in workerd
+`unit.lib.spec.ts`, `users.admin.spec.ts` — **286 tests across fifteen**, run in workerd
 against a real local D1 with no mocks.
 
 ## 2. Release map
@@ -278,7 +279,7 @@ Profile photos are implemented: owned uploads and public serving, conditional
 attachment, recoverable retirement/removal, and bounded daily cleanup. The API
 accepts only validated 512-square WebP avatars up to 240 KiB. The browser accepts
 JPEG/PNG/static WebP and supplies crop/resize without new runtime dependencies.
-Other media kinds and link thumbnails remain future work.
+Page-image upload support is available for the R1.5 thumbnail key field.
 
 | | |
 | --- | --- |
@@ -289,55 +290,55 @@ Other media kinds and link thumbnails remain future work.
 | **Exit** | An avatar uploads, attaches, serves and deletes; `PUBLIC_BUCKET` has stopped being an unused binding. |
 | **UI** 🎨 | In-browser crop and resize (**D4**). The API stops at "store exactly the bytes you were given". |
 
-### R1.4 — Page address API ⏳
+### R1.4 — Page address API ✅
 
 | | |
 | --- | --- |
 | **Schema** | none — `pages.slug` and `slug_reservations` already exist. |
-| **API** | `GET /api/v1/pages/slug-available?slug=` → `{ slug, available, reason }`, reusing the `assertSlugAvailable` exported in R1.0 (normalise first, then check reserved → taken → reservation). `PATCH /api/v1/pages/:id` gains `slug`, which `UpdatePageInput` deliberately lacks today ("Slugs are claimed at creation and IMMUTABLE in this slice", `page.service.ts`). |
-| **Rename policy** | On success: normalise, re-check availability, write `pages.slug`, audit `page.slug_change` with before/after, and reserve the **old** slug only under the anti-squat policy (**D10**). Reserving unconditionally would also lock the owner out of renaming back, which is not the intent. |
-| **Route ordering** | `GET /slug-available` must be registered **before** `GET /:id`, or Hono matches it as an id — the same trap already handled for `PUT /:id/links/order`. Add a regression test. |
-| **Tests** | Availability matrix (free / taken / reserved / held by a released reservation), rename happy path, `409` for each refusal, `404` for a foreign page, an audit row per rename, and (per D10) the owner can reclaim the address they released. |
+| **API** | `GET /api/v1/pages/slug-available?slug=` → `{ slug, available, reason }`, reusing the R1.0 slug policy after normalization. `PATCH /api/v1/pages/:id` accepts `slug`; writes are guarded against a concurrent claim. |
+| **Rename policy** | D10 is settled: reserve the old slug permanently with reason `page_renamed`, audit `page.slug_change` with before/after, and prevent its later reuse. A previously released reservation remains available. |
+| **Route ordering** | `GET /slug-available` is registered before `GET /:id`, with a regression test. |
+| **Tests** | Availability matrix (free / taken / reserved / active reservation / released reservation), normalized rename, permanent old-slug reservation, rename conflict and foreign-page `404`, and audit evidence. |
 | **Exit** | An owner can check an address before committing to it, and rename a page without losing revision history or admin audit. |
 | **UI** 🎨 | Address field with live availability and a change confirmation step. |
 
-### R1.5 — Links v2 API ⏳
+### R1.5 — Links v2 API ✅
 
 | | |
 | --- | --- |
-| **Schema** | `0004_link_groups_and_thumbnails.sql`: new `link_groups (id, page_id, name, position, created_at, updated_at)`; and on `page_links`: `group_id TEXT REFERENCES link_groups(id)`, `open_in_new_tab INTEGER NOT NULL DEFAULT 0`, `thumbnail_key TEXT`. Insert `link_groups` into `VOLATILE_TABLES` **immediately after** `page_links` — children are deleted first, and `page_links.group_id` points at `link_groups`. |
-| **API** | Link create/update gain `openInNewTab`, `groupId`, `thumbnailKey`. Group CRUD: `GET`/`POST /pages/:id/groups`, `PATCH`/`DELETE /pages/:id/groups/:groupId`, `PUT /pages/:id/groups/order`. Bulk: `POST /pages/:id/links/bulk { ids, action: hide \| show \| delete \| move, groupId? }` — one request, one rate-limit hit, one audit entry per affected link. Trash: `GET /pages/:id/links?trashed=1` and `POST /pages/:id/links/:linkId/restore`. Metadata: `POST /pages/:id/links/metadata { url }`. |
-| **Scheduling** | `starts_at`/`ends_at` already flow through create/update and are enforced by the service, so the API for windows is nearly done. Add a **derived** `status` (`scheduled \| active \| expired`) to `toPageLinkDto` so no client re-implements the comparison, and settle the "coming soon" placeholder (**D13**). |
-| **SSRF** | `…/links/metadata` is the only place this API fetches a user-supplied URL. Allow `http`/`https` only; refuse loopback, private, link-local and metadata targets (`127.0.0.0/8`, `10/8`, `172.16/12`, `192.168/16`, `169.254.0.0/16`, `::1`, `fc00::/7`); cap redirects; cap body bytes; hard timeout; **never proxy the response bytes** back to the browser. This is security-critical and deserves its own test file. |
-| **Retention** | New setting `content.trash_retention_days` (default 30). The daily cron purges links whose `deleted_at` is older than the window. `page_links.deleted_at` exists and is written on delete — nothing reads it today, so a deleted link is currently invisible and permanent. |
-| **Tests** | `links.api.spec.ts`: new columns round-trip; group CRUD and FK behaviour; bulk is all-or-nothing in one `db.batch()`; trash → restore → purge; the SSRF refusal matrix; derived status at the exact millisecond boundary; `429` on `pages_write_user` for bulk. |
+| **Schema** | `0004_link_groups_and_thumbnails.sql`: `link_groups` plus `page_links.group_id`, `open_in_new_tab` and `thumbnail_key`. `link_groups` is in `VOLATILE_TABLES` after `page_links`. |
+| **API** | Link create/update support `openInNewTab`, same-page `groupId`, and owned page-image `thumbnailKey`. Group CRUD and exact reorder: `GET`/`POST /pages/:id/groups`, `PATCH`/`DELETE /pages/:id/groups/:groupId`, `PUT /pages/:id/groups/order`. Bulk: `POST /pages/:id/links/bulk` (`hide`, `show`, `delete`, `move`), one write-limit check and an audit entry per affected link. Trash: `GET /pages/:id/links?trashed=1`, `POST /pages/:id/links/:linkId/restore`. Metadata: `POST /pages/:id/links/metadata { url }`. |
+| **Scheduling** | `toPageLinkDto` returns derived `status` (`scheduled`, `active`, `expired`) with inclusive start/end instants. D13's placeholder choice remains a UI concern; the API returns status only. |
+| **SSRF** | Metadata fetching limits schemes and ports, rejects non-public IP literals and private/reserved DNS answers, manually validates up to three redirects, applies a hard timeout and 512 KiB response cap, and returns only extracted title/description. HTML bytes are never proxied. |
+| **Retention** | Seeded setting `content.trash_retention_days` defaults to 30. Daily maintenance permanently purges soft-deleted links at the cutoff; restore is permitted before purge. |
+| **Tests** | `links.api.spec.ts` and `link-metadata.spec.ts` cover defaults, CRUD/FK ownership, atomic bulk validation and audit, trash/restore/purge, SSRF refusals, and exact schedule boundaries; bulk is rate-limited by `pages_write_user`. |
 | **Exit** | The whole link surface the spec describes exists behind the API, `deleted_at` is finally read, and the outbound fetch refuses every private target in the matrix. |
 | **UI** 🎨 | Groups, drag-reorder, bulk selection, trash view, thumbnail picker, time-window editor. |
 
-### R1.6 — Draft, autosave & version history API ⏳
+### R1.6 — Draft, autosave & version history API ✅
 
 | | |
 | --- | --- |
-| **Schema** | `0005_page_drafts.sql`: `page_drafts (id, page_id UNIQUE REFERENCES pages(id), content TEXT NOT NULL, updated_by, created_at, updated_at)`. **D5** chooses a separate row over draft columns on `pages`, so published content cannot be mutated by autosave *by construction* rather than by discipline. The snapshot envelope becomes `{ v: 1, page, links, groups }`; existing snapshots have no `v` and must be read tolerantly. |
-| **API** | `PUT /pages/:id/draft` (autosave, with an `updatedAt` guard so two tabs cannot silently clobber each other); `GET /pages/:id/draft`; `POST /pages/:id/draft/discard`; `GET /pages/:id/revisions` (metadata only, newest 10); `GET /pages/:id/revisions/:revision`; `POST /pages/:id/revisions/:revision/restore` — which writes the **draft**, never the live row, so restoring is always a previewable step. |
-| **Publish** | `POST /pages/:id/publish` changes from "snapshot the live row" (`page.service.ts`) to "apply the draft to the live row in one `db.batch()`, snapshot the result, bump the revision". `unpublishedChanges` becomes a real field on the owner DTO: true when a draft exists that is newer than the last publish. |
-| **Rate limits** | Autosave cannot share `pages_write_user` (120/h) — a five-second flush exhausts it in ten minutes and then blocks the owner from publishing. Seed `page_autosave_user` as **`throttle`, never `block`**: a degraded autosave must not lock someone out of their own editor. |
-| **Pruning** | Keep the newest 10 `page_revisions` rows per page, pruned in the same batch as the insert. `idx_revisions_page` already supports the lookup. |
-| **Tests** | `drafts.api.spec.ts`: autosave never touches `pages`; publish applies the draft; `unpublishedChanges` flips both ways; discard; restore writes a draft and leaves live content untouched; the stale-write guard; prune keeps exactly 10; `429` on the autosave rule; a snapshot stored before `v` existed still reads. |
-| **Exit** | An owner can save continuously, see that unpublished changes exist, publish, revert, and restore any of the last ten versions — and a published page does **not** change until publish is called. |
+| **Schema** | `0005_page_drafts.sql`: one `page_drafts` row per page, with versioned JSON content. **D5** uses a separate row, so autosave cannot mutate published rows. New revision snapshots use `{ v: 1, page, links, groups }`; legacy `{ page, links }` snapshots remain readable. |
+| **API** | `PUT /pages/:id/draft` uses an atomic `updatedAt` compare-and-set; `GET /pages/:id/draft`; discard; metadata-only newest-10 revision listing and detail; restore writes a new draft with fresh child IDs, never live content. |
+| **Publish** | Publish applies the guarded draft to the relational live page/link/group rows, writes a versioned revision and baseline draft, bumps `content_revision`, and prunes history in one D1 batch. Owner DTOs report `unpublishedChanges` from draft and publish timestamps. |
+| **Rate limits** | Seeded `page_autosave_user` is 1200/hour with the `throttle` action. The autosave route surfaces depletion as a 429, without spending the ordinary `pages_write_user` budget. |
+| **Pruning** | The publish batch keeps the newest 10 `page_revisions` per page; `idx_revisions_page` supports the history reads. |
+| **Tests** | `drafts.api.spec.ts`: autosave/live isolation, publish and status changes, stale-write 412, discard, restore-to-draft, legacy snapshot compatibility, prune to 10, and autosave 429. |
+| **Exit** | An owner can autosave without altering live content, publish explicitly, discard, inspect history, and restore any retained revision to a previewable draft. |
 | **UI** 🎨 | Autosave indicator, unpublished-changes banner, version list, restore confirmation. |
 
-### R1.7 — Public page & sharing API ⏳
+### R1.7 — Public page & sharing API ✅
 
 | | |
 | --- | --- |
 | **Schema** | none. The block model that contact collection will need is Release 2, and the draft envelope's `v` field is the seam that lets it be added without invalidating stored revisions. |
-| **API** | `GET /api/v1/public/pages/:slug` extends `toPublicPage` with the owner's identity — `avatarUrl`, `bio`, `location`, `pronouns`, visible socials. Today it emits only `owner: { username, displayName }`. It must stay cache-friendly and must not leak `status`, `moderationStatus`, `revision`, `viewCount` or `clicks`; `pages.api.spec.ts` already asserts those are absent — **extend that assertion, do not replace it**. |
-| **Preview** | `GET /api/v1/pages/:id/preview` renders the draft through the same mapper the public route uses, so preview and production cannot drift: one function, two callers. |
-| **Sharing** | Everything the sharing sheet needs is derivable client-side from `platform.pages_base_url` + slug. So: (a) guarantee `pages_base_url` is reachable on the public settings endpoint, (b) add `GET /api/v1/public/pages/:slug/qr` **only if** a server-rendered PNG is chosen (**D14** — otherwise QR generation is pure client work), and (c) settle OG/SEO delivery (**D1**). |
-| **Caching** | Public reads are anonymous and hot. Do not add a view beacon here yet (that is Release 2), but keep the read pure so it stays cacheable and a `POST /public/pages/:slug/events` can be added later without touching the render path. |
-| **Tests** | `public.api.spec.ts` (new): unpublished → `404`; moderation-removed → `404`; the payload carries identity and never internal fields; preview equals the public payload for identical content; a draft that has not been published does not change the public payload. |
-| **Exit** | A published page serves the exact shape the editor previews, to anonymous callers, with nothing internal in it. |
+| **API** | `GET /api/v1/public/pages/:slug` now includes owner `avatarUrl`, profile `bio`, `location`, `pronouns`, and visible socials. Public link DTOs omit internal timestamps/click counts; status, moderation, revision and view counts stay absent. |
+| **Preview** | `GET /api/v1/pages/:id/preview` and the anonymous read share `renderPublicPage`/`toPublicPage`; owner preview renders the current draft, while public reads remain tied to published rows. |
+| **Sharing** | `platform.pages_base_url` is guaranteed by public settings, with the shipped default as fallback. D14 remains client QR generation; D1 remains SPA-only at first. No QR endpoint or SEO rewrite was added. |
+| **Caching** | Public reads are pure anonymous reads: no view beacon (Release 2), analytics side effect, or cache mutation. |
+| **Tests** | `public.api.spec.ts`: owner identity and visible-social allowlist, absence of internal fields, exact public/preview parity, and proof that draft changes do not affect the public payload. Existing unpublished/moderation 404 coverage remains in `pages.api.spec.ts`. |
+| **Exit** | A published page returns a public-only identity/render payload, and the authenticated preview uses the same mapper without exposing uncommitted content publicly. |
 | **UI** 🎨 | Public route and renderer, live preview, copy link, share intents, QR download (PNG + SVG), native share. |
 
 ## 4. Closing Release 1
@@ -359,32 +360,61 @@ security, account record, against R1.1/R1.2). That leaves R1.8 as the staff cons
 monolithic pass over the whole SPA.
 
 The UI stream is now **handed to a second owner**. `UI-ROADMAP.md` §0 is that stream's
-built-versus-to-build dashboard and its phase detail stays in §7; this file keeps the API
-plan and picks up with **R1.3**.
+built-versus-to-build dashboard and its phase detail stays in §7; R1.9 has closed the
+Release 1 API plan, which resumes with Release 2.
 
 The console namespace move (**S3**) is applied to the SPA router **before** the first new
 console screen, not after: `AppShell` and `Guards` need a nested `/app` layout first.
 
-### R1.9 — Release 1 hardening ⏳
+### R1.9 — Release 1 hardening ✅
 
-- **Docs:** ~~fix `README.md`~~ **Done** — it now reports 242 tests / 11 files, lists the
+- **Status (2026-10-07).** Complete. The local migration rehearsal and repeat-seed checks
+  are complete; all **286 API tests / 15 files** pass, as do workspace typecheck,
+  production build, and `git diff --check`. The local browser pass verified registration
+  and session, profile editing, avatar upload/attachment/public read, page address and
+  link creation, draft autosave isolation, publishing, public rendering, and copying the
+  reachable public URL. On the running Worker, reserved/taken slugs returned `409` and
+  invalid page input returned `422`. The API suite verifies the remaining negative paths:
+  each rate-limited write budget (`429`), impersonated writes (`403`), foreign resources
+  (`404`), and maintenance-mode writes (`503`). No remote deployment or migration was run.
+- **Docs:** ~~fix `README.md`~~ **Done** — it now reports 286 tests / 15 files, lists the
   `/pages` and `/profile` routes, and points at this file. Keep it current as screens land.
-- **End to end:** one scripted pass against `wrangler dev` — signup → profile → avatar →
-  address → links → autosave → publish → public page → share.
-- **Negative paths:** `409` reserved/taken slug, `422` bad input, `429` on every new
-  limit, `403` impersonated writes, `404` foreign resources, `503` maintenance mode.
-- **Migration rehearsal:** apply `0003`–`0005` to a fresh local D1 *and* to one that
+- **End to end:** ~~one scripted pass against `wrangler dev` — signup → profile → avatar →
+  address → links → autosave → publish → public page → share~~ **Done** (local browser
+  pass; public link copied and read back from the clipboard).
+- **Negative paths:** ~~`409` reserved/taken slug, `422` bad input, `429` on every new
+  limit, `403` impersonated writes, `404` foreign resources, `503` maintenance mode~~
+  **Done** (live Worker for `409`/`422`; API suite for the rest and all new rate limits).
+- **Migration rehearsal:** ~~apply `0003`–`0005` to a fresh local D1 *and* to one that
   already holds rows, then run `npm run db:seed:local` twice. `INSERT OR IGNORE` protects
   settings, but the new tables have no seed row to ignore — idempotency must be proven,
-  not assumed.
+  not assumed~~ **Done** (fresh and existing local D1; repeat seed was a no-op).
 - **Release 1 is done when:** `npm run typecheck` is clean, `npm test` is green including
   every new suite, and the loop above completes by hand in the browser.
 
 ## 5. Release 2 — after the loop exists 📦
 
+### R2.1 — Teams & collaboration ✅ API
+
+`0006_page_teams.sql` adds page members and expiring email invitations. Owners
+manage members and invitations; editors can read and change page content; viewers
+have read-only page access. The existing page-access seam scopes both single-page
+reads and `/pages/mine` to the same ownership-or-membership predicate, and owner
+DTOs include `accessRole`.
+
+- `GET /api/v1/pages/:id/members`; owner-only `PATCH`/`DELETE` member routes.
+- Owner-only `GET`/`POST /api/v1/pages/:id/invitations` and `DELETE` invitation.
+- `GET /api/v1/page-invitations` and `POST /:id/accept`; acceptance requires an
+  active signed-in account whose email matches the invitation.
+- Invitations expire after seven days, default to viewer, use the existing
+  `pages_write_user` budget, send the seeded `page_invitation` template, and are
+  audited in the same D1 batch as each change.
+- `page-members.api.spec.ts` covers roles, invitation acceptance/revocation,
+  foreign-account refusal, owner-only management, and rate limiting.
+
 | # | Item | Why it cannot come earlier |
 | --- | --- | --- |
-| R2.1 | **Teams & collaboration** — `page_members`, per-page roles, invites | Needs R1.0's `requirePageAccess(db, actor, pageId, minRole)` seam, by rewriting `resolvePageRole` / `pageAccessPredicate` in `page-access.service.ts`. Without it, every owner route is rewritten instead of one function. |
+| R2.1 ✅ | **Teams & collaboration** — `page_members`, per-page roles, invites | Implemented above using R1.0's page-access seam. |
 | R2.2 | **Custom domains** — `domains`, DNS verification, TLS | A user domain must serve **public pages only**, never auth or the console (`__Host-` cookies cannot be scoped to it). `pages_base_url` becomes per-page instead of global. |
 | R2.3 | **Analytics** — view/click events, `POST /public/pages/:slug/events`, dashboards | Needs R1.7's pure public read as the anchor, and finally gives `view_count` and `page_links.clicks` writers. |
 | R2.4 | **Contact collection** — form blocks, submissions, spam control | Needs the draft envelope's `v` field from R1.6, or adding a block type invalidates every stored revision. |
@@ -404,6 +434,7 @@ and server-side rendering of public pages (the SPA renders them; OG/SEO is **D1*
 | `apps/api/migrations/0003_profile_fields.sql` | R1.2 | `users.location`, `users.pronouns`, new `user_social_links` | Additive. `ALTER TABLE ADD COLUMN` cannot add a CHECK, so platform validation lives in zod **and** the service. |
 | `apps/api/migrations/0004_link_groups_and_thumbnails.sql` | R1.5 | new `link_groups`; `page_links.group_id`, `.open_in_new_tab`, `.thumbnail_key` | Additive. Backfill `open_in_new_tab` to `0` by default is the only sane reading of existing rows. |
 | `apps/api/migrations/0005_page_drafts.sql` | R1.6 | new `page_drafts` (`page_id` UNIQUE) | Additive. Snapshot envelope gains `v: 1`; old snapshots stay readable. |
+| `apps/api/migrations/0006_page_teams.sql` | R2.1 | `page_members`, `page_invitations` | Additive. The page owner stays on `pages.user_id`; only viewer/editor are grantable member roles. |
 
 Seed rows — appended to `apps/api/seed/0001_platform-defaults.sql`, because
 `db:seed:local` / `db:seed:remote` name that one file (`apps/api/package.json`). A second
@@ -528,16 +559,16 @@ uses, which is the only way the `__Host-` cookie behaves at all.
 | Link trash / restore | R1.5 | `deleted_at` written, never read |
 | Link scheduling | R1.5 | columns + validation already live |
 | Link metadata autofetch | R1.5 | nothing |
-| Autosave | R1.6 | nothing |
-| Unpublished changes | R1.6 | nothing (unpublish is a status flip) |
-| Version history / restore | R1.6 | `page_revisions` written on publish; no read, no restore |
-| Public page | R1.7 | exists, identity-poor |
-| Preview | R1.7 | nothing |
-| Sharing / copy link | R1.7, R1.8 | `platform.pages_base_url` |
-| QR code | R1.7 (**D14**) | nothing |
+| Autosave | R1.6 ✅ | `page_drafts` |
+| Unpublished changes | R1.6 ✅ | draft timestamp compared with last publish |
+| Version history / restore | R1.6 ✅ | `page_revisions` read, pruned, and restorable to draft |
+| Public page | R1.7 ✅ | shared render mapper with owner identity |
+| Preview | R1.7 ✅ | authenticated draft preview |
+| Sharing / copy link | R1.7 ✅ | public `platform.pages_base_url` setting |
+| QR code | R1.7 (**D14**) | client-side generation, UI pending |
 | Analytics | Release 2 | `view_count` / `clicks` have no writers |
 | Contact forms | Release 2 | no schema |
-| Teams | Release 2 | needs the R1.0 access seam |
+| Teams | R2.1 ✅ | `page_members`, `page_invitations`, role-checked page access and invitations |
 | Custom domains | Release 2 | conflicts with `__Host-` single origin |
 | Admin console | Release 2 | APIs exist and are tested; screens do not |
 

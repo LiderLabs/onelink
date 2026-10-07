@@ -25,7 +25,7 @@ interface FormErrors {
   confirm?: string
 }
 
-export function ChangePasswordForm({ forced }: { forced: boolean }) {
+export function ChangePasswordForm({ forced, disabled = false }: { forced: boolean; disabled?: boolean }) {
   const session = useSession()
 
   const [currentPassword, setCurrentPassword] = useState('')
@@ -38,6 +38,7 @@ export function ChangePasswordForm({ forced }: { forced: boolean }) {
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (disabled) return
     setError(null)
     setRevokedSessions(null)
 
@@ -69,7 +70,7 @@ export function ChangePasswordForm({ forced }: { forced: boolean }) {
   }
 
   return (
-    <form onSubmit={(event) => void onSubmit(event)} noValidate className="space-y-6">
+    <form onSubmit={(event) => void onSubmit(event)} noValidate className="space-y-6" aria-disabled={disabled}>
       {error ? (
         <Notice tone="error" label="Could not change the password">
           {error}
@@ -83,6 +84,7 @@ export function ChangePasswordForm({ forced }: { forced: boolean }) {
         </Notice>
       ) : null}
 
+      <fieldset disabled={disabled || pending} className="space-y-6">
       <AuthField
         label="Current password"
         name="currentPassword"
@@ -120,6 +122,7 @@ export function ChangePasswordForm({ forced }: { forced: boolean }) {
       <Button type="submit" pending={pending} pendingLabel="Changing" className="w-full">
         {forced ? 'Set new password' : 'Change password'}
       </Button>
+      </fieldset>
     </form>
   )
 }

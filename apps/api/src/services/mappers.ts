@@ -11,6 +11,7 @@ import type {
   UserSocialLinkRow,
 } from '../types'
 import { mediaUrlFor } from '../lib/media'
+import { now } from '../lib/clock'
 
 // ============================================================================
 // Row -> DTO mapping. Kept in one place so every endpoint exposes the same
@@ -158,6 +159,7 @@ export function toApiPage(row: PageRow, revision: number | null): Record<string,
     moderationStatus: row.moderation_status,
     visibility: row.visibility,
     revision,
+    unpublishedChanges: false,
     publishedAt: row.published_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -171,10 +173,26 @@ export function toApiPage(row: PageRow, revision: number | null): Record<string,
  * and database-only fields are deliberately absent.
  */
 export function toPublicPage(
-  row: PageRow,
-  username: string,
-  displayName: string,
+  row: {
+    slug: string
+    title: string | null
+    bio: string | null
+    theme: string
+    layout: string
+    accentColor: string | null
+    showBranding: boolean
+  },
+  owner: {
+    username: string
+    displayName: string
+    avatarUrl: string | null
+    bio: string | null
+    location: string | null
+    pronouns: string | null
+    socials: Array<{ platform: string; url: string; position: number }>
+  },
   links: ReturnType<typeof toPageLinkDto>[],
+  groups: Array<{ id: string; name: string; position: number }>,
 ): Record<string, unknown> {
   return {
     slug: row.slug,
@@ -182,10 +200,11 @@ export function toPublicPage(
     bio: row.bio,
     theme: row.theme,
     layout: row.layout,
-    accentColor: row.accent_color,
-    showBranding: row.show_branding === 1,
-    owner: { username, displayName },
+    accentColor: row.accentColor,
+    showBranding: row.showBranding,
+    owner,
     links,
+    groups,
   }
 }
 
@@ -195,7 +214,7 @@ export function toPublicPage(
  * migrations/0002_pages_theme_and_scheduling.sql for why the API follows the
  * database here instead of inventing `label` / `iconKey`.
  */
-export function toPageLinkDto(row: PageLinkRow): Record<string, unknown> {
+export function toPageLinkDto(row: PageLinkRow, timestamp = now()): Record<string, unknown> {
   return {
     id: row.id,
     title: row.title,
@@ -207,6 +226,14 @@ export function toPageLinkDto(row: PageLinkRow): Record<string, unknown> {
     isVisible: row.is_visible === 1,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
+    groupId: row.group_id ?? null,
+    openInNewTab: row.open_in_new_tab === 1,
+    thumbnailKey: row.thumbnail_key ?? null,
+    status: row.ends_at !== null && row.ends_at < timestamp
+      ? 'expired'
+      : row.starts_at !== null && row.starts_at > timestamp
+        ? 'scheduled'
+        : 'active',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

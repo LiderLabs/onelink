@@ -37,6 +37,18 @@ export function RequireAuth() {
     const next = encodeURIComponent(`${location.pathname}${location.search}`)
     return <Navigate to={`/login?next=${next}`} replace />
   }
+  if (session.mustChangePassword && location.pathname !== '/app') {
+    return <Navigate to="/app" replace />
+  }
+  if (session.user.status !== 'active' && location.pathname !== '/app') {
+    return <Navigate to="/app" replace />
+  }
+  if (
+    session.user.impersonatedBy !== null &&
+    location.pathname !== '/app'
+  ) {
+    return <Navigate to="/app" replace />
+  }
 
   return <Outlet />
 }
@@ -50,7 +62,7 @@ export function RequireAnonymous() {
   if (session.status === 'unavailable') return <UnavailableScreen />
   if (session.user) {
     const next = safeNext(new URLSearchParams(location.search).get('next'))
-    return <Navigate to={next ?? '/app/profile'} replace />
+    return <Navigate to={next ?? '/app'} replace />
   }
 
   return <Outlet />

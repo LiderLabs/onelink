@@ -18,22 +18,27 @@ interface ConsoleLink {
   label: string
 }
 
-const CONSOLE_LINKS: ConsoleLink[] = [{ to: '/app/profile', label: 'Profile' }]
+const CONSOLE_LINKS: ConsoleLink[] = [
+  { to: '/app', label: 'Dashboard' },
+  { to: '/app/pages', label: 'My pages' },
+  { to: '/app/analytics', label: 'Analytics' },
+  { to: '/app/settings', label: 'Settings' },
+]
 
 function Links({ className }: { className?: string }) {
   return (
-    <ul className={cx('space-y-0.5', className)}>
+    <ul className={cx('flex min-w-max items-center gap-5 sm:gap-8', className)}>
       {CONSOLE_LINKS.map((link) => (
         <li key={link.to}>
           <NavLink
             to={link.to}
-            end
+            end={link.to === '/app'}
             className={({ isActive }) =>
               cx(
-                'block border-l-2 py-1.5 pl-2 font-mono text-[0.6875rem] uppercase tracking-[0.16em] transition-colors',
+                'flex shrink-0 items-center border-b-2 border-transparent px-0 py-3 font-sans text-sm normal-case tracking-normal transition-colors duration-150',
                 isActive
-                  ? 'border-l-ink text-ink'
-                  : 'border-l-transparent text-ink-soft hover:border-l-rule hover:text-ink',
+                  ? 'border-ink font-semibold text-ink'
+                  : 'text-ink-soft hover:text-ink',
               )
             }
           >
@@ -45,23 +50,10 @@ function Links({ className }: { className?: string }) {
   )
 }
 
-export function ConsoleNav({ compact = false }: { compact?: boolean }) {
-  if (compact) {
-    return <nav aria-label="Console" className="console-top-nav"><Links /></nav>
-  }
+export function ConsoleNav() {
   return (
-    <nav aria-label="Console" className="lg:sticky lg:top-12">
-      <details className="lg:hidden">
-        <summary className="eyebrow cursor-pointer list-none select-none">
-          Console menu <span aria-hidden="true">▾</span>
-        </summary>
-        <Links className="mt-3" />
-      </details>
-
-      <div className="hidden lg:block">
-        <p className="eyebrow">Console</p>
-        <Links className="mt-4" />
-      </div>
+    <nav aria-label="Console" className="border-b border-rule">
+      <Links className="w-max min-w-full overflow-x-auto" />
     </nav>
   )
 }

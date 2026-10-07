@@ -13,9 +13,8 @@ import type { ActorInfo, PageLinkRow, PageRow, Pagination } from '../types'
 // questions, so the questions live here and nowhere else. A team model then
 // rewrites `pageAccessPredicate` and `resolvePageRole` instead of every route.
 //
-// Ownership today is `pages.user_id = actor.id`, which is exactly what the
-// three functions did inline, so this refactor is deliberately behaviour
-// preserving — including the error it throws.
+// Ownership remains `pages.user_id = actor.id`; collaborators add a page_members
+// row and one of the bounded roles below.
 //
 // The invariant every caller relies on: a page the actor cannot reach is
 // `404 Page`, never `403`. Missing, soft-deleted, foreign and
@@ -35,9 +34,12 @@ export const PAGE_ROLE_RANK: Record<PageRole, number> = {
 }
 
 /** The role the actor holds on this page, or `null` when they hold none. */
-export function resolvePageRole(actor: ActorInfo, page: Pick<PageRow, 'user_id'>): PageRole | null {
-  // R2.1: consult page_members before this fallback.
-  return page.user_id === actor.id ? 'owner' : null
+export function resolvePageRole(
+  actor: ActorInfo,
+  page: Pick<PageRow, 'user_id' | 'member_role'>,
+): PageRole | null {
+  if (page.user_id === actor.id) return 'owner'
+  return page.member_role ?? null
 }
 
 /**
@@ -49,23 +51,27 @@ export function resolvePageRole(actor: ActorInfo, page: Pick<PageRow, 'user_id'>
  * every column is qualified, so nothing depends on the table alias.
  */
 export function pageAccessPredicate(actor: ActorInfo): { clause: string; binds: unknown[] } {
-  // R2.1: widen to `pages.user_id = ? OR EXISTS (SELECT 1 FROM page_members ...)`.
-  return { clause: 'pages.user_id = ?', binds: [actor.id] }
+  return {
+    clause: `(pages.user_id = ? OR EXISTS (
+      SELECT 1 FROM page_members
+       WHERE page_members.page_id = pages.id AND page_members.user_id = ?
+    ))`,
+    binds: [actor.id, actor.id],
+  }
 }
 
 export interface PageAccess {
   /** The live row. A page the actor cannot reach never reaches a caller. */
   page: PageRow
-  /** What the actor may do with it. `owner` for everyone today. */
+  /** The actor's effective per-page role. */
   role: PageRole
 }
 
 /**
  * The one read path every owner route uses.
  *
- * `minRole` defaults to `'owner'` because ownership is still the only role that
- * exists; R2.1 passes `'editor'`/`'viewer'` for the surfaces they may reach and
- * nothing else changes.
+ * `minRole` defaults to `'owner'`; content read/write routes opt into the
+ * minimum role they need, while page and team administration stay owner-only.
  */
 export async function requirePageAccess(
   db: D1Database,
@@ -77,11 +83,15 @@ export async function requirePageAccess(
 
   const row = await db
     .prepare(
-      `SELECT pages.* FROM pages
+      `SELECT pages.*,
+              (SELECT page_members.role FROM page_members
+                WHERE page_members.page_id = pages.id AND page_members.user_id = ?
+                LIMIT 1) AS member_role
+         FROM pages
         WHERE pages.id = ? AND ${clause} AND pages.deleted_at IS NULL
         LIMIT 1`,
     )
-    .bind(pageId, ...binds)
+    .bind(actor.id, pageId, ...binds)
     .first<PageRow>()
 
   const role = row ? resolvePageRole(actor, row) : null
@@ -137,12 +147,16 @@ export async function listAccessiblePages(
   const [rowsResult, countResult] = await db.batch([
     db
       .prepare(
-        `SELECT pages.* FROM pages
+        `SELECT pages.*,
+                (SELECT page_members.role FROM page_members
+                  WHERE page_members.page_id = pages.id AND page_members.user_id = ?
+                  LIMIT 1) AS member_role
+           FROM pages
           WHERE ${clause} AND pages.deleted_at IS NULL
           ORDER BY pages.updated_at DESC, pages.id DESC
           LIMIT ? OFFSET ?`,
       )
-      .bind(...binds, pagination.limit, pagination.offset),
+      .bind(actor.id, ...binds, pagination.limit, pagination.offset),
     db
       .prepare(`SELECT count(*) AS total FROM pages WHERE ${clause} AND pages.deleted_at IS NULL`)
       .bind(...binds),

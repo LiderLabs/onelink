@@ -46,7 +46,7 @@ export function LoginRoute() {
     setPending(true)
     try {
       await session.login(identifier.trim(), password)
-      navigate(next ?? '/app/profile', { replace: true })
+      navigate(next ?? '/app', { replace: true })
     } catch (caught) {
       setError(errorMessageFor(caught))
       setFieldErrors(fieldErrorsFrom(caught))

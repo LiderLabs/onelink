@@ -15,6 +15,7 @@
     "types": "npm run types -w @onelink/api",
     "typecheck": "npm run types && npm run typecheck -w @onelink/api && npm run typecheck -w @onelink/web",
     "test": "npm run test -w @onelink/api",
+    "browser:acceptance": "node scripts/browser/ui-acceptance.mjs",
     "db:create": "npm run db:create -w @onelink/api",
     "db:migrate:local": "npm run db:migrate:local -w @onelink/api",
     "db:migrate:remote": "npm run db:migrate:remote -w @onelink/api",

@@ -64,7 +64,7 @@ export function RegisterRoute() {
         password,
         ...(displayName.trim() ? { displayName: displayName.trim() } : {}),
       })
-      navigate(next ?? '/app/profile', { replace: true })
+      navigate(next ?? '/app', { replace: true })
     } catch (caught) {
       setError(errorMessageFor(caught))
       setFieldErrors(fieldErrorsFrom(caught))

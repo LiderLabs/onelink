@@ -190,6 +190,7 @@ export const SETTING_KEYS = {
   requireReason: 'moderation.require_reason',
   reportCooldownMinutes: 'moderation.report_cooldown_minutes',
   maxLinksPerPage: 'content.max_links_per_page',
+  trashRetentionDays: 'content.trash_retention_days',
   reservedSlugs: 'content.reserved_slugs',
   reservedUsernames: 'content.reserved_usernames',
   maxAppealAttempts: 'appeals.max_attempts',
@@ -343,4 +344,3 @@ export async function updateSettings(
   invalidateSettingsCache()
   return { updated, changed }
 }
-

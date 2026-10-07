@@ -335,7 +335,11 @@ const VOLATILE_TABLES = [
   'reports',
   'media_assets',
   'page_revisions',
+  'page_invitations',
+  'page_drafts',
   'page_links',
+  'link_groups',
+  'page_members',
   'slug_reservations',
   'pages',
   'sessions',
@@ -377,4 +381,3 @@ export async function resetMediaStorage(): Promise<void> {
     } while (cursor)
   }
 }
-

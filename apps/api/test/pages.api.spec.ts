@@ -16,6 +16,7 @@ import {
 // answer (`MAX(page_revisions.revision)`), so a test can assert that the
 // denormalised `pages.content_revision` the API now reads still agrees with it.
 import { latestRevision } from '../src/services/page.service'
+import { ulid } from '../src/lib/ids'
 
 // ============================================================================
 // /api/v1/pages + GET /api/v1/public/pages/:slug — the owner's link pages.
@@ -274,6 +275,7 @@ describe('GET /api/v1/pages/mine and GET /:id', () => {
     // `content_revision` used to leak straight out of the table.
     expect(Object.keys(page).sort()).toEqual([
       'accentColor',
+      'accessRole',
       'bio',
       'createdAt',
       'deletedAt',
@@ -287,9 +289,11 @@ describe('GET /api/v1/pages/mine and GET /:id', () => {
       'status',
       'theme',
       'title',
+      'unpublishedChanges',
       'updatedAt',
       'visibility',
     ])
+    expect(page.accessRole).toBe('owner')
     expect(Object.keys(page).filter((key) => key.includes('_'))).toEqual([])
   })
 
@@ -392,6 +396,113 @@ describe('editing a page', () => {
     const foreign = await api('PATCH', `/api/v1/pages/${pageId}`, {
       cookie: await loginAs(stranger),
       body: { title: 'Hijacked' },
+    })
+    expect(foreign.status).toBe(404)
+  })
+})
+
+describe('R1.4 page addresses', () => {
+  it('checks normalized slugs before the dynamic page-id route', async () => {
+    const first = await createTestUser({ role: 'user' })
+    const second = await createTestUser({ role: 'user' })
+    const firstCookie = await loginAs(first)
+    const secondCookie = await loginAs(second)
+    await createPageAs(firstCookie, { slug: 'claimed-name' })
+
+    await env.DB.prepare(
+      `INSERT INTO slug_reservations (id, slug, reserved_by, reason, created_at, released_at)
+       VALUES (?, ?, ?, 'test_released', ?, ?)`,
+    ).bind(ulid(), 'released-name', first.id, Date.now(), Date.now()).run()
+    await env.DB.prepare(
+      `INSERT INTO slug_reservations (id, slug, reserved_by, reason, created_at)
+       VALUES (?, ?, ?, 'test_active', ?)`,
+    ).bind(ulid(), 'old-address', first.id, Date.now()).run()
+
+    const free = await api<Envelope<{ slug: string; available: boolean; reason: string | null }>>(
+      'GET',
+      '/api/v1/pages/slug-available?slug=%20New.Name%20',
+      { cookie: firstCookie },
+    )
+    expect(free.status).toBe(200)
+    expect(free.body.data).toEqual({ slug: 'new-name', available: true, reason: null })
+
+    const taken = await api<Envelope<{ slug: string; available: boolean; reason: string | null }>>(
+      'GET', '/api/v1/pages/slug-available?slug=CLAIMED-NAME', { cookie: firstCookie },
+    )
+    expect(taken.body.data).toEqual({ slug: 'claimed-name', available: false, reason: 'taken' })
+
+    const reserved = await api<Envelope<{ slug: string; available: boolean; reason: string | null }>>(
+      'GET', '/api/v1/pages/slug-available?slug=login', { cookie: firstCookie },
+    )
+    expect(reserved.body.data).toEqual({ slug: 'login', available: false, reason: 'reserved' })
+
+    const held = await api<Envelope<{ slug: string; available: boolean; reason: string | null }>>(
+      'GET', '/api/v1/pages/slug-available?slug=old-address', { cookie: firstCookie },
+    )
+    expect(held.body.data).toEqual({ slug: 'old-address', available: false, reason: 'reservation' })
+
+    const released = await api<Envelope<{ slug: string; available: boolean; reason: string | null }>>(
+      'GET', '/api/v1/pages/slug-available?slug=released-name', { cookie: firstCookie },
+    )
+    expect(released.body.data).toEqual({ slug: 'released-name', available: true, reason: null })
+
+    const missingSlug = await api('GET', '/api/v1/pages/slug-available', { cookie: secondCookie })
+    expect(missingSlug.status).toBe(400)
+  })
+
+  it('renames a page, audits the change, and permanently reserves its previous slug', async () => {
+    const user = await createTestUser({ role: 'user' })
+    const cookie = await loginAs(user)
+    const created = await createPageAs(cookie, { slug: 'original-address' })
+    const pageId = (created.body.data as ApiPage).id
+
+    const renamed = await api<Envelope<ApiPage>>('PATCH', `/api/v1/pages/${pageId}`, {
+      cookie,
+      body: { slug: '  New.Address!!!  ' },
+    })
+    expect(renamed.status).toBe(200)
+    expect(renamed.body.data.slug).toBe('new-address')
+
+    const reservation = await env.DB.prepare(
+      `SELECT slug, page_id, reserved_by, reason FROM slug_reservations WHERE slug = ? AND released_at IS NULL`,
+    ).bind('original-address').first<Record<string, unknown>>()
+    expect(reservation).toMatchObject({
+      slug: 'original-address',
+      page_id: pageId,
+      reserved_by: user.id,
+      reason: 'page_renamed',
+    })
+
+    const audit = await env.DB.prepare(
+      `SELECT action, before, after FROM audit_logs WHERE target_id = ? AND action = 'page.slug_change'`,
+    ).bind(pageId).first<{ action: string; before: string; after: string }>()
+    expect(audit?.action).toBe('page.slug_change')
+    expect(JSON.parse(audit?.before ?? '{}')).toMatchObject({ slug: 'original-address' })
+    expect(JSON.parse(audit?.after ?? '{}')).toMatchObject({ slug: 'new-address' })
+
+    const reclaim = await api('PATCH', `/api/v1/pages/${pageId}`, {
+      cookie,
+      body: { slug: 'original-address' },
+    })
+    expect(reclaim.status).toBe(409)
+  })
+
+  it('rejects renaming to a used slug and hides foreign pages as not found', async () => {
+    const owner = await createTestUser({ role: 'user' })
+    const other = await createTestUser({ role: 'user' })
+    const ownerCookie = await loginAs(owner)
+    const ownerPage = await createPageAs(ownerCookie, { slug: 'my-address' })
+    const otherPage = await createPageAs(await loginAs(other), { slug: 'other-address' })
+
+    const conflict = await api('PATCH', `/api/v1/pages/${(ownerPage.body.data as ApiPage).id}`, {
+      cookie: ownerCookie,
+      body: { slug: 'other-address' },
+    })
+    expect(conflict.status).toBe(409)
+
+    const foreign = await api('PATCH', `/api/v1/pages/${(otherPage.body.data as ApiPage).id}`, {
+      cookie: ownerCookie,
+      body: { slug: 'new-address' },
     })
     expect(foreign.status).toBe(404)
   })
@@ -720,7 +831,7 @@ describe('GET /api/v1/public/pages/:slug', () => {
     expect(response.status).toBe(200)
     expect(response.body.data.page.slug).toBe('public-page')
     expect(response.body.data.page.title).toBe('public-page title')
-    expect(response.body.data.page.owner).toEqual({
+    expect(response.body.data.page.owner).toMatchObject({
       username: user.username,
       displayName: user.username,
     })

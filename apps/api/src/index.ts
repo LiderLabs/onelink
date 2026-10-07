@@ -3,6 +3,7 @@ import { now } from './lib/clock'
 import { auditInsertStmt, pruneAuditLogs, standaloneEntry } from './services/audit.service'
 import { SETTING_KEYS, getNumberSetting } from './services/settings.service'
 import { cleanupAvatarMedia } from './services/media-maintenance.service'
+import { purgeTrashedPageLinks } from './services/page.service'
 
 // ============================================================================
 // Worker entrypoint.
@@ -21,6 +22,7 @@ export interface MaintenanceReport {
   auditRowsPruned: number
   avatarAssetsRemoved: number
   avatarCleanupFailed: number
+  linksPurged: number
 }
 
 /**
@@ -68,6 +70,7 @@ export async function runMaintenance(env: Cloudflare.Env): Promise<MaintenanceRe
   const retentionDays = await getNumberSetting(db, SETTING_KEYS.auditRetentionDays, 0)
   const auditRowsPruned = await pruneAuditLogs(db, retentionDays)
   const avatarCleanup = await cleanupAvatarMedia(env, timestamp)
+  const linksPurged = await purgeTrashedPageLinks(db, timestamp)
 
   return {
     sanctionsExpired: results[0]?.meta.changes ?? 0,
@@ -75,6 +78,7 @@ export async function runMaintenance(env: Cloudflare.Env): Promise<MaintenanceRe
     auditRowsPruned,
     avatarAssetsRemoved: avatarCleanup.removed,
     avatarCleanupFailed: avatarCleanup.failed,
+    linksPurged,
   }
 }
 

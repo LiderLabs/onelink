@@ -58,6 +58,7 @@ export const MEDIA_KEY_PATTERN = new RegExp(`^(?:${KEY_ROOT_ALTERNATION})/${KEY_
 
 /** The same shape, narrowed to the one kind an avatar field may name. */
 export const AVATAR_KEY_PATTERN = new RegExp(`^${KEY_ROOTS.avatar}/${KEY_SHAPE}$`)
+export const PAGE_IMAGE_KEY_PATTERN = new RegExp(`^${KEY_ROOTS.page_image}/${KEY_SHAPE}$`)
 
 /** Bound for a key arriving in a request body, before any pattern check. */
 export const MAX_MEDIA_KEY_LENGTH = 128

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { SessionUser, SocialLink } from '../../lib/types'
 import type { Crop, DecodedPhoto } from '../media/types'
 import { ProfileAvatar } from './ProfileAvatar'
@@ -20,6 +20,7 @@ export function ProfilePreview({ identity, avatarKey, photo, socials }: {
   identity: PreviewIdentity; avatarKey: string | null; photo: PreviewPhoto | null; socials: PreviewSocials
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
+  const [viewport, setViewport] = useState<'mobile' | 'desktop'>('mobile')
   useLayoutEffect(() => {
     const context = canvas.current?.getContext('2d')
     if (photo && context) {
@@ -30,8 +31,14 @@ export function ProfilePreview({ identity, avatarKey, photo, socials }: {
   }, [photo])
   const visible = socials.links.filter(link => link.isVisible)
   return <section className="profile-preview" aria-label="Live profile preview">
-    <div className="profile-preview-heading"><h2>Live preview</h2><span><i aria-hidden="true" /> As you edit</span></div>
-    <div className="profile-preview-page">
+    <div className="profile-preview-heading">
+      <div><h2>Live preview</h2><span><i aria-hidden="true" /> As you edit</span></div>
+      <div className="profile-preview-viewports" role="group" aria-label="Preview viewport">
+        <button type="button" aria-pressed={viewport === 'mobile'} onClick={() => setViewport('mobile')}>Mobile</button>
+        <button type="button" aria-pressed={viewport === 'desktop'} onClick={() => setViewport('desktop')}>Desktop</button>
+      </div>
+    </div>
+    <div className={`profile-preview-page ${viewport === 'mobile' ? 'is-mobile' : 'is-desktop'}`}>
       {photo ? <canvas ref={canvas} width={512} height={512} className="profile-preview-photo" role="img" aria-label="Profile photo preview" />
         : <ProfileAvatar avatarKey={avatarKey} displayName={identity.displayName} className="profile-preview-photo" />}
       <h3>{identity.displayName.trim() || 'Your name'}</h3>

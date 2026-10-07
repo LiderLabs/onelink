@@ -189,6 +189,8 @@ export type PageLayout = 'list' | 'grid'
 export interface PageRow {
   id: string
   user_id: string
+  /** Joined by the page-access seam; absent on ordinary page-table reads. */
+  member_role?: 'viewer' | 'editor' | null
   slug: string
   title: string | null
   bio: string | null
@@ -223,10 +225,22 @@ export interface PageLinkRow {
   is_visible: number
   starts_at: number | null
   ends_at: number | null
+  group_id: string | null
+  open_in_new_tab: number
+  thumbnail_key: string | null
   clicks: number
   created_at: number
   updated_at: number
   deleted_at: number | null
+}
+
+export interface LinkGroupRow {
+  id: string
+  page_id: string
+  name: string
+  position: number
+  created_at: number
+  updated_at: number
 }
 
 /** `page_revisions.reason` is NOT NULL and CHECKed, so publishes must pass one. */
@@ -246,6 +260,15 @@ export interface PageRevisionRow {
   reason: PageRevisionReason
   created_by: string | null
   created_at: number
+}
+
+export interface PageDraftRow {
+  id: string
+  page_id: string
+  content: string
+  updated_by: string | null
+  created_at: number
+  updated_at: number
 }
 
 export interface SlugReservationRow {

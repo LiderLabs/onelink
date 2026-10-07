@@ -1,10 +1,11 @@
 # OneLink — User-facing UI roadmap
 
-Date: 2026-10-06
-Status: **U0 + U1 built and committed**; U2–U10 not started. §0 is the built-versus-to-build
+Date: 2026-10-07
+Status: **U0–U4 built**; U0 + U1 are committed, U2–U4 and the R1.9 copy-link action are
+implemented in the current working tree and not yet committed. §0 is the built-versus-to-build
 dashboard — read that first.
 Owner: the UI stream is handed to a second owner working from this file. The API stream
-continues in `ROADMAP.md` (**R1.3** next).
+continues in `ROADMAP.md` (Release 1 hardening complete).
 Baseline for the UI: `c23eeb1`. U0 + U1 landed as `feat(web): console namespace (U0) and
 profile screen (U1)`, the first UI commit after it. `apps/api/test` was green before and
 after — **171 tests, 7 files** — because no API file was touched.
@@ -26,8 +27,8 @@ it**, which is why the API suites were 171/7 both before and after.
 
 | Phase | What is in the repository | Consumes |
 | --- | --- | --- |
-| **U0** console shell and namespace | the `/app` nested layout and its rail, `/app/profile`, a `/app/*` console 404 that cannot fall through to a slug, `/profile` → `/app/profile`, `/` → `/app`, `/:slug` + `/p/:slug` public skeleton, and every shared primitive listed below | — |
-| **U1** profile identity and socials | `/app/profile`: identity, social links, security, account record — the spec §5 screen, with the previous account page kept whole inside it | R1.1 `PATCH /auth/me` · R1.2 `/profile/socials` |
+| **U0** console shell and namespace | the `/app` nested layout and its rail, dashboard-anchored profile/social editing, compatibility redirects from `/app/profile` and `/app/socials`, a `/app/*` console 404 that cannot fall through to a slug, `/` → `/app`, `/:slug` + `/p/:slug` public skeleton, and every shared primitive listed below | — |
+| **U1** profile identity and socials | `/app` dashboard: identity, social links, security, account record, and live preview — the spec §5 editor embedded in the page | R1.1 `PATCH /auth/me` · R1.2 `/profile/socials` |
 
 The files that commit added or changed, so nobody has to diff to find them:
 
@@ -68,48 +69,58 @@ apps/web/src/
 | --- | --- |
 | `npm run typecheck` (worker types + both workspaces) | clean |
 | `npm --workspace apps/web run build` (`tsc --noEmit && vite build`) | clean |
-| `npm test` — the API suites, i.e. the UI's contract evidence | **171 passing / 7 files**, unchanged |
-| Browser pass at desktop width and ~375 px against local Wrangler/D1 | **not done** (§9 item 3) |
-| Six-session-state matrix on the profile screen | **not done** (§9 item 4) |
+| `npm test` — the API suites, i.e. the UI's contract evidence | **286 passing / 15 files** |
+| `npm run browser:acceptance` | **passing**; fixture-driven route, session, failure-state, keyboard, reduced-motion, and responsive checks |
+| Session, error, accessibility and dirty-form matrices | **partial**; see §9 for proven cases and remaining gaps |
 
-U0 and U1 are therefore ✅ on code paths and types, **not** on a click-through: the
-environment that wrote them had no browser and no running Worker/D1. Nothing is known to be
-broken; nothing is *proven* either. The last two rows of that table are the first work a
-new UI owner should do — they are cheap, and they are what would promote U0/U1 from ✅ to
-*verified*.
+The browser suite uses intercepted API fixtures and does not mutate D1. It checks the
+session redirect boundary only; the sign-in and registration page UI is intentionally
+excluded from this acceptance scope. U5–U9 remain in progress, and U10's real-service,
+media, and broader interaction checks are still outstanding.
 
-### 0.2 To build — in order
+### 0.2 Built and to build — in order
 
-**Profile live preview is implemented.** The existing `/app/profile` editor now
+**Profile live preview is implemented on Dashboard.** The `/app` screen now
 previews unsaved identity, photo crops, social-link edits/additions, visibility,
-and order. Save remains explicit; cancel/undo restores saved values. This is the
-client-side profile preview. Top navbar links to **Profile** (`/app/profile`)
-and **Socials** (`/app/socials`) separate photo/details, security, and session
-information from social links and preview. The avatar and username appear at the
-top right; switching pages preserves drafts. U9's server-driven page preview, sharing, and QR
-tools below remain separate work.
+and order. Save remains explicit; cancel/undo restores saved values. Profile,
+socials, security, session details, and preview are on one dashboard screen;
+legacy `/app/profile` and `/app/socials` URLs redirect to dashboard anchors.
+The page editor now has U9's server-driven
+preview, native share intents, and QR tools; selected preview/history/QR behavior was
+smoke-checked with mocked editor data. The copy-public-link action was added during R1.9.
+
+**Mockup surfaces are present without pretending their Release 2 APIs exist.**
+`/app` is a pages-backed dashboard; `/app/analytics` and the page editor's Analytics
+section say that metrics are not collected; `/app/settings` identifies custom domains,
+contact collection, and team access as unavailable; `/app/submissions` contains no
+fabricated records and keeps export disabled. These UI shells do not move R2.1–R2.4
+out of the API roadmap. The dashboard surfaces real page/link DTOs, copy/share/preview/
+publish actions, and unavailable-stat/activity labels. The page editor uses Profile,
+Links, Design, Analytics, and Settings navigation; its link editor is modal, with
+group filters, hidden links, visibility controls, and metadata suggestions.
 
 | Phase | Produces | Needs | Can start |
 | --- | --- | --- | --- |
-| **U2** ⏳ | `/app/pages`, `/app/pages/new`, plus the `requestList`/`Pagination` and `UnavailableResource` primitives | R1.1 ✅ exists | **today — this is next** |
-| **U3** ⏳ | `/app/pages/:id`: appearance, links, publication, plus `SaveStateNotice` and `PageRenderer` | R1.1 ✅ exists | today |
-| **U4** ⏳ | the real `/:slug` renderer (not the skeleton) | the public read endpoint, which exists | today — identity only arrives in **U9** |
-| **U5** ✅ | avatar picker, browser crop/resize, upload, replace/remove | R1.3 avatar API exists | avatar flow implemented; generic page-image API exists, picker UI pending |
-| **U6** 🚧 | the address field, live availability check, and the rename confirmation | **R1.4 — not built** | after R1.4 |
-| **U7** 🚧 | link groups, `openInNewTab`, bulk, trash and restore, thumbnails, time windows | **R1.5 — not built** | after R1.5 |
-| **U8** 🚧 | autosave, the unpublished-changes state, the version list | **R1.6 — not built** | after R1.6 |
-| **U9** 🚧 | the server-driven preview, sharing, copy link, QR | **R1.7 — not built** | after R1.7 |
+| **U2** ✅ | `/app/pages` and `/app/pages/new`: paginated list, creation, confirmed deletion | R1.1 ✅ exists | built |
+| **U3** ✅ | `/app/pages/:id`: appearance, links, scheduling, publication, and shared renderer preview | R1.1 ✅ exists | built |
+| **U4** ✅ | the real `/:slug` and `/p/:slug` public renderer | R1.7 public read with identity ✅ | built |
+| **U5** 🚧 | avatar crop/upload plus page-image upload for link thumbnails | R1.3 ✅ API complete | implemented; full browser acceptance pending |
+| **U6** 🚧 | the address field, live availability check, and the rename confirmation | R1.4 ✅ API complete | implemented; full browser acceptance pending |
+| **U7** 🚧 | link groups, `openInNewTab`, bulk hide/show/move/delete, trash and restore, thumbnails, time windows | R1.5 ✅ API complete | implemented; full browser acceptance pending |
+| **U8** 🚧 | autosave, the unpublished-changes state, publish/discard and version history | R1.6 ✅ API complete | implemented; selected failure checks; full acceptance pending |
+| **U9** 🚧 | server-driven preview, native sharing and QR (copy public link shipped in R1.9) | R1.7 ✅ API complete | implemented; selected preview/QR checks; full acceptance pending |
 | **U10** ⏳ | the session, error, accessibility and dirty-form sweeps | U0–U9 | last |
 
-The practical shape of the handover: **U2 → U3 → U4 are the three phases that need nothing
-from the API stream.** Every phase after them is blocked on exactly one API phase
-(R1.3–R1.7), which `ROADMAP.md` is taking in that order. If both streams run at once, the
-API stream should front-load **R1.3**, because it is the first one that unblocks a UI
-phase — and the UI owner should not start U5–U9 against a route that does not exist
-(ground rule 3).
+U2–U4 are built. U5–U9 are implemented in the editor and creation screens, but remain
+in progress until their full browser and failure-state acceptance checks pass. U10's
+cross-screen session, error, accessibility and dirty-form sweep is underway, not complete.
+API
+dependencies R1.3–R1.7 are complete; do not add UI calls for routes or fields that the
+corresponding API contract does not provide (ground rule 3).
 
-Not in this file at all: the staff console, settings, audit, teams and Release 2. §8 says
-where each of those went and why.
+Not in this file as functional features: the staff console, audit, teams and Release 2
+capabilities. §8 says where each went and why. The settings shell is limited to
+available page/sharing tools and explicit unavailable-state notices.
 
 ### 0.3 What a new owner must not break
 
@@ -117,9 +128,10 @@ where each of those went and why.
 
 1. **`lib/types.ts` mirrors the server mappers by hand, on purpose.** A change to
    `apps/api/src/services/mappers.ts` and the matching type land in the same commit.
-2. **No production dependency without a decision.** `apps/web` still has exactly three
-   (`react`, `react-dom`, `react-router-dom`) and no test runner. An icon set, a date
-   picker, a crop library, a QR library or a query library is a decision (**UD6**, **D4**,
+2. **No production dependency without a decision.** `apps/web` has the approved
+   `qrcode` dependency in addition to `react`, `react-dom`, and `react-router-dom`;
+   `@types/qrcode` is development-only. The user approved QR tooling for U9. An icon set,
+   a date picker, a crop library, or a query library remains a decision (**UD6**, **D4**,
    **D14**), not a convenience.
 3. **Nothing is fabricated.** A screen renders what its DTO carries and never fills a gap
    by calling a protected endpoint. That rule is what makes U4 honest and U9 necessary.
@@ -231,9 +243,9 @@ one change set (the console namespace, and the profile screen that consumes R1.1
 | Surface | Reality |
 | --- | --- |
 | Router | `createBrowserRouter` over a `RouteObject[]` (`App.tsx`), rendered by `main.tsx`, with two top-level branches: `AppShell` (chrome + guards) and `PublicLayout` (no chrome, no session). `useBlocker` is therefore available. |
-| Console routes | `/app` (index → `/app/profile`) · `/app/profile` · `/app/*` → console 404 that cannot fall through to a slug |
+| Console routes | `/app` (dashboard with profile/social editor) · `/app/profile` and `/app/socials` compatibility redirects · `/app/*` → console 404 that cannot fall through to a slug |
 | Auth routes | `/login`, `/register`, `/forgot-password`, `/reset-password` |
-| Compatibility | `/` → `/app` · `/profile` → `/app/profile`, kept for existing bookmarks |
+| Compatibility | `/` → `/app` · `/profile` → `/app#profile-editor` · `/app/profile` and `/app/socials` → dashboard anchors |
 | Public routes | `/:slug` and `/p/:slug` → `PublicPageRoute`: a layout skeleton with no session and no console chrome that fabricates nothing (the renderer is U4) |
 | Guards | `RequireAnonymous`, `RequireAuth` (`components/Guards.tsx`) with `safeNext` validating a local `next` path. `/app` requires a session only — what a session may DO is decided per screen, because the API's answers differ per action. |
 | Shell | `AppShell` owns the masthead, the maintenance banner, the suspension notice, skip-to-content and the footer. `ConsoleLayout` adds the rail (`ConsoleNav`) inside `/app`. |
@@ -252,6 +264,11 @@ one change set (the console namespace, and the profile screen that consumes R1.1
 `/app/profile` is now the *identity* screen the spec describes (§5): identity, social
 links, security and the account record, with the password half kept exactly as it was and
 the old URL still resolving. It was an additive restructure, not a new screen.
+
+**Current placement:** profile and social editing now render inside `/app` alongside
+the dashboard; `/app/profile` and `/app/socials` are anchor redirects, not separate
+screens. `IdentityForm`, `SocialsEditor`, and photo upload remain the same guarded
+components, while the dashboard owns the profile preview and page summary.
 
 Not built, because nothing consumes them yet — building them now would be dead code that
 pins wording before the surface that needs it exists:
@@ -280,21 +297,21 @@ instead of to a dialog about a form that can no longer be saved.
 | UI phase | Screens | Depends on | Ready? |
 | --- | --- | --- | --- |
 | **U0** Console shell & namespace | `/app/*` layout, `/profile` redirect, public layout skeleton | — | **done** ✅ |
-| **U1** Profile identity & socials | `/app/profile` | R1.1 ✅, R1.2 ✅ | **done** ✅ |
-| **U2** My pages & create | `/app/pages`, `/app/pages/new` | R1.1 ✅ | yes — API exists |
-| **U3** Page editor: appearance, links, publish | `/app/pages/:id` | R1.1 ✅ | yes — API exists |
-| **U4** Public renderer | `/:slug`, `/p/:slug` | the public read endpoint, which exists today but is identity-poor | yes — completed by U9 |
-| **U5** Media picker & crop | avatar on `/app/profile` | R1.3 avatar API | implemented |
-| **U6** Address field & rename | address section in `/app/pages/:id` | **R1.4** ⏳ | no — blocked on R1.4 |
-| **U7** Links v2 in the editor | groups, bulk, trash, thumbnails, windows | **R1.5** ⏳ | no — blocked on R1.5 |
-| **U8** Autosave, unpublished changes, versions | editor save state, version list | **R1.6** ⏳ | no — blocked on R1.6 |
-| **U9** Preview parity & sharing | preview, copy link, share, QR | **R1.7** ⏳ | no — blocked on R1.7 |
+| **U1** Profile identity & socials | `/app` dashboard profile editor | R1.1 ✅, R1.2 ✅ | **done** ✅ |
+| **U2** My pages & create | `/app/pages`, `/app/pages/new` | R1.1 ✅ | **built** ✅ |
+| **U3** Page editor: appearance, links, publish | `/app/pages/:id` | R1.1 ✅ | **built** ✅ |
+| **U4** Public renderer | `/:slug`, `/p/:slug` | R1.7 public read with identity ✅ | **built** ✅ |
+| **U5** Media picker & crop | avatar in the dashboard profile editor | R1.3 avatar API | implemented; full browser acceptance pending |
+| **U6** Address field & rename | address section in `/app/pages/:id` | R1.4 ✅ API complete | implemented; full browser acceptance pending |
+| **U7** Links v2 in the editor | groups, bulk, trash, thumbnails, windows | R1.5 ✅ API complete | implemented; full browser acceptance pending |
+| **U8** Autosave, unpublished changes, versions | editor save state, version list | R1.6 ✅ API complete | implemented; selected failure checks; full acceptance pending |
+| **U9** Preview parity & sharing | server-driven preview, native share, QR (copy link shipped in R1.9) | R1.7 ✅ API complete | implemented; selected preview/QR checks; full acceptance pending |
 | **U10** Cross-cutting sweep & hardening | every user-facing route | U0–U9 | after U0–U9 |
 
-**The honest split.** U0–U4 consume API the repository already has, so they are
-buildable in this order without waiting for anything. U5–U9 each sit behind exactly
-one API phase, which is why the ROADMAP's ordering (**R1.6 before the editor's save
-semantics**, **R1.7 before an honest preview**) is preserved rather than fought.
+**The honest split.** U0–U9 are implemented, and API dependencies R1.3–R1.7 are complete.
+Selected browser checks have been performed, but full phase acceptance and U10's
+cross-cutting matrices are still outstanding. The ROADMAP's ordering (**R1.6 before the
+editor's save semantics**, **R1.7 before an honest preview**) is preserved.
 
 Two consequences worth stating before any code is written:
 
@@ -378,7 +395,7 @@ socials and must present a prominent read-only notice. `PATCH /auth/me` and the 
 writes share one seeded `profile_write_user` budget (60/h), so the `429` copy uses the
 server's `retry-after` and never presents the rule as a global quota (spec §2).
 
-### U2 — My pages and page creation ⏳ *(unblocked today)*
+### U2 — My pages and page creation ✅
 
 | | |
 | --- | --- |
@@ -404,7 +421,7 @@ consequence a person would not predict. Foreign, deleted and missing page ids al
 render the same unavailable UI — the API answers `404` for each and the UI must not
 invent a distinction it cannot see.
 
-### U3 — Page editor: appearance, links, publication ⏳ *(unblocked today)*
+### U3 — Page editor: appearance, links, publication ✅
 
 | | |
 | --- | --- |
@@ -435,11 +452,11 @@ history/restore action — that is U8, and inventing one here would be a lie.
 a *published* page changes the live page immediately. U3 states it plainly wherever a
 save can reach a published page (**UD4**), and U8 replaces the wording when drafts exist.
 
-### U4 — Public renderer ⏳ *(unblocked today; completed by U9)*
+### U4 — Public renderer ✅ *(extended by U9)*
 
 | | |
 | --- | --- |
-| **Depends on** | today's `GET /public/pages/:slug` — it exists and returns the real page, minus owner identity |
+| **Depends on** | `GET /public/pages/:slug` — returns the public page and its permitted owner identity |
 | **Screens** | `/:slug` (published page) · `/p/:slug` (fallback for a slug colliding with a fixed root route) |
 | **Builds** | Nothing new: it consumes `PageRenderer` from U3, which is the point |
 | **Exit** | Spec §12.6: public light/dark and list/grid pages render safely; draft/removed/under-review or unusable-owner pages show unavailable; a network failure offers retry |
@@ -452,23 +469,23 @@ HTML. The response's links are the public authority: visibility and schedule fil
 already happened server-side. Accent colour is treated as decoration and must not break
 contrast.
 
-Identity fields (avatar, bio, location, pronouns, socials) are **absent from this DTO
-today**. U4 renders what is there and does not fetch them through protected endpoints
-to look complete (ground rule 3). U9 adds them when R1.7 puts them in the payload.
+The public DTO now includes permitted identity fields (avatar, bio, location, pronouns,
+socials). The renderer consumes those fields from the public response and never fetches
+them through protected endpoints.
 
-### U5 — Media picker and crop ✅ *(avatars implemented)*
+### U5 — Media picker and crop 🚧 *(implemented; browser verification pending)*
 
 The profile photo flow includes local crop/zoom/reset, bounded WebP encoding,
 progress, confirmed removal, concurrent-edit detection, ambiguous-response
 reconciliation, cleanup retries, and initials fallback. Native dialog controls
-support keyboard and pointer/touch input. No crop library was added. Link
-thumbnail reuse remains U7 work.
+support keyboard and pointer/touch input. No crop library was added. The generic
+page-image upload/delete flow is also used by U7's link-thumbnail picker.
 
 | | |
 | --- | --- |
 | **Depends on** | R1.3 — `POST /media`, `DELETE /media/:id`, and R1.1's `PATCH /auth/me { avatarKey }` |
-| **Screens** | the avatar section of `/app/profile`; the link thumbnail picker reuses it in U7 |
-| **Builds** | `features/media/` — picker, in-browser crop/resize to a small square WebP, upload progress, replace and remove |
+| **Screens** | the avatar section of `/app/profile`; link thumbnails in `/app/pages/:id` |
+| **Builds** | `features/media/` — avatar crop/resize and upload, plus page-image upload/delete for link thumbnails |
 | **Exit** | An avatar uploads, attaches, renders, is replaced without orphaning the old object, and deletes; a rejected type or size explains itself; `PUBLIC_BUCKET` stops being an unused binding |
 
 Crop and resize happen **in the browser** (**D4** default: the API stores exactly the
@@ -483,7 +500,7 @@ seeded `media_upload_user` rule (60/h, **throttle**, not `block`) is a normal so
 refusal — the copy uses the server's `retry-after` and does not present the rule as a
 global quota or a broken feature.
 
-### U6 — Address field and rename 🚧 *(blocked on R1.4)*
+### U6 — Address field and rename 🚧 *(implemented; browser verification pending)*
 
 | | |
 | --- | --- |
@@ -505,21 +522,21 @@ copy-link, preview and QR surface re-renders against the new slug, and the `/p/:
 fallback is re-evaluated: renaming into a fixed root route name must explain the fallback
 rather than hand back a URL that 404s.
 
-### U7 — Links v2 in the editor 🚧 *(blocked on R1.5)*
+### U7 — Links v2 in the editor 🚧 *(implemented; browser verification pending)*
 
 | | |
 | --- | --- |
 | **Depends on** | R1.5 — link `openInNewTab`/`groupId`/`thumbnailKey`, group CRUD, bulk, trash/restore, metadata, derived `status` |
 | **Screens** | the link panel of `/app/pages/:id`; a trash view inside the same screen |
-| **Exit** | Groups, bulk actions, trash and restore, the thumbnail picker, the time-window editor and metadata autofetch all work through the API; a trash purge has a visible deadline |
+| **Exit** | Groups, bulk hide/show/move/delete, trash and restore, the thumbnail picker, the time-window editor and metadata suggestions are available; the trash view explains the 30-day retention policy |
 
 Group CRUD and assignment, the `openInNewTab` toggle, and a thumbnail picker that
-reuses U5's flow. **Bulk is one request**: `POST /links/bulk` is a single rate-limit hit
-that writes one audit entry per affected link, so selecting twenty rows sends one
-request and never a loop of twenty — the UI must be written for the endpoint, not around
-it. Trash is `?trashed=1` with restore, and the view names the purge window
-(`content.trash_retention_days`, default 30) so "restore" has a deadline instead of
-looking permanent.
+reuses U5's flow. In the versioned editor, bulk selection changes the draft together and
+autosaves through the draft endpoint; it must not call the live-mutating `POST /links/bulk`
+and bypass U8's publish boundary. Trash is `?trashed=1` with restore, and the view names
+the purge window (`content.trash_retention_days`, default 30) so "restore" has a deadline
+instead of looking permanent. The current DTO does not expose a per-link purge timestamp,
+so the UI states the retention policy rather than inventing a specific expiry date.
 
 Two things the UI must **not** compute. The derived `status` (`scheduled`/`active`/
 `expired`) is displayed verbatim: the millisecond boundary is the API's answer, and a
@@ -529,7 +546,7 @@ the API returns rather than inventing a placeholder. Metadata autofetch is an ex
 button that shows the fetched title/description and lets the owner apply or ignore it;
 it never writes and never auto-saves.
 
-### U8 — Autosave, unpublished changes, version history 🚧 *(blocked on R1.6)*
+### U8 — Autosave, unpublished changes, version history 🚧 *(implemented; browser verification pending)*
 
 | | |
 | --- | --- |
@@ -561,30 +578,30 @@ degraded autosave cannot lock an owner out of their own editor. The UI must refl
 that: a soft `429` on a save is reported as "still trying" with the server's
 `retry-after`, and it never disables publishing.
 
-### U9 — Preview parity and sharing 🚧 *(blocked on R1.7)*
+### U9 — Preview parity and sharing 🚧 *(implemented; browser verification pending)*
 
 | | |
 | --- | --- |
 | **Depends on** | R1.7 — `GET /pages/:id/preview`, identity extended into `toPublicPage`, `pages_base_url` guaranteed on public settings |
 | **Screens** | preview in `/app/pages/:id`; the sharing sheet; the public page gains identity |
-| **Exit** | The preview and the public page render from the same mapper and cannot drift; the public payload carries the owner's identity and leaks nothing internal; copy link and QR produce reachable URLs |
+| **Exit** | The preview and the public page render from the same mapper and cannot drift; the public payload carries the owner's identity and leaks nothing internal; native share and QR produce reachable URLs. Copy public link is implemented and verified in R1.9. |
 
 The preview stops being a local render of entered values and becomes the **server's
 preview DTO** — the same function the public route uses (**UD3**). One consequence is
 worth stating because it changes what the screen may claim: from here on the preview is
 authoritative, and before here it was not.
 
-The public renderer gains what R1.7 adds — avatar, bio, location, pronouns and visible
-socials — and nothing else: `status`, `moderationStatus`, `revision`, `viewCount` and
-`clicks` stay out of the payload and therefore out of the UI. The API's existing
-"these keys are absent" assertion is extended rather than replaced, and the UI simply
-must not display what is not sent.
+U4 already renders the public identity R1.7 added — avatar, bio, location, pronouns and
+visible socials — and nothing else: `status`, `moderationStatus`, `revision`, `viewCount`
+and `clicks` stay out of the payload and therefore out of the UI. U9 now consumes the
+server preview DTO rather than local editor values.
 
 Sharing is derived, not fetched: the copy-link and share URLs come from the **current
 origin** plus the slug (spec §6), never from the seeded `https://onelink.local/`, with
 `/p/:slug` as the fallback for a fixed-root-route collision. Share intents use the same
-URL, native share is used only where the browser offers it, and QR codes are generated
-client-side (**D14** default) as PNG **and** SVG with size and margin options. There is
+URL; copy-link is implemented in R1.9. U9 adds native share where the browser offers it
+and client-side QR codes (**D14**) as PNG **and** SVG with size, margin, color and
+optional local logo controls. The user approved the `qrcode` package for this UI. There is
 no analytics beacon, no SEO rewrite (**D1**) and no server-side PNG endpoint.
 
 ### U10 — Cross-cutting sweep and hardening ⏳
@@ -627,8 +644,8 @@ Kept out on purpose, with the reason and where each went. None of these is cance
 | Item | Where it went | Why it is not here |
 | --- | --- | --- |
 | Staff console screens — `/app/admin/users`, `/new`, `/:id`, `/app/admin/settings`, `/app/admin/audit`, `/audit/:id` (spec §8–§9) | after U10, then **R2.7** | The APIs exist and are tested; only screens are missing. Sequencing them first would put the owner loop behind five capability and rank matrices that do not affect an ordinary account. |
-| Teams and per-page roles (**R2.1**) | Release 2 | Needs the R1.0 page-access seam rewritten (`resolvePageRole` / `pageAccessPredicate`), and there is no `page_members` table yet. |
-| Analytics dashboards (**R2.3**), contact collection (**R2.4**), custom domains (**R2.2**), email delivery (**R2.5**), moderation engine (**R2.6**) | Release 2 | No endpoint exists for any of them. A screen for a feature with no route can only be a mock, and mocks are how a product starts lying. |
+| Teams and per-page roles (**R2.1**) | Release 2 | API implemented; team management and invitation UI remains future work. |
+| Analytics dashboards (**R2.3**), contact collection (**R2.4**), custom domains (**R2.2**), email delivery (**R2.5**), moderation engine (**R2.6**) | Release 2 | No endpoint exists for these capabilities. The current console has only explicit unavailable-state notices—no fake metrics, submissions, or working actions; functional screens wait for their APIs. |
 | Impersonation **start**, audit **export**, staff **invitations** | not planned | Named in documentation, implemented nowhere in the checked code (spec §2). A capability name is not a route. |
 | QR via a server-rendered PNG (**D14**), OG/SEO edge rewrite (**D1**), per-page custom CSS/JS | deliberately excluded | Client-side QR by default; SEO degrades link previews rather than correctness; custom CSS/JS is a stored-XSS foot-gun on a single origin and is explicitly not planned (ROADMAP §5). |
 
@@ -681,17 +698,29 @@ worth the dependency.
 6. The docs this phase makes untrue are fixed in the same change set — README's screen
    list when a route appears, the ROADMAP's UI markers when a phase lands.
 
-**Where U0 + U1 stand against that list.** Items 1, 2, 5 and 6 pass in this change set
-(`tsc --noEmit` clean, `vite build` clean, no screen renders data its DTO lacks, and §4,
-§5, §6, §7, §10 and the README were corrected in the same change set).
+**U10 status: partial verification; exit criteria not met.** The fixture-driven
+`npm run browser:acceptance` suite passes. It covers:
 
-Items 3 and 4 have **not** been done: the environment this was written in has no browser
-and no running Worker/D1, so neither the desktop/375 px click-through nor the six-state
-session matrix (anonymous · ordinary · forced rotation · suspended/pending · impersonated ·
-maintenance) has been exercised. U0 and U1 are marked ✅ on the strength of their code
-paths — verified against the mappers, routes and guards on the server, and type-checked —
-not on a click-through. That pass is the first thing to do on a machine running
-`npm run dev` + `npm run dev:web`, and it is what would promote them from ✅ to *verified*.
+- Anonymous console redirect and a protected-request 401 redirect; active, forced
+  password-change, pending, suspended, and impersonated sessions; maintenance-mode
+  create refusal.
+- Dashboard, page list/editor, public render and not-found, profile preview/undo,
+  keyboard-triggered social reorder (including the hidden row in the full order
+  payload), mobile/desktop profile-preview toggles, the link-editor modal, QR, and
+  the honest unavailable-state routes.
+- 403 with no retry, 404, 409 with the typed address retained, 429 retry countdown and
+  manual retry, public-read network recovery, create 422 with focused/preserved input,
+  and create 500 with no automatic mutation replay.
+- Successful profile save and page creation normalization; dirty-create navigation
+  cancellation/discard; dialog Escape and focus return; a synthetic `beforeunload`
+  cancellation check; widths 320, 375, 768, 1280, and 1440 px; and reduced-motion.
+
+The suite mocks the API and does not prove behavior against local Wrangler/D1. It
+does not cover the avatar/page-image media pipelines, every U7–U9 mutation, touch
+reordering, the browser's actual tab-close prompt, or every form's success and failure
+normalization. Those checks remain before U10 or the affected U5–U9 phase can be
+marked complete. Authentication page UI is outside this sweep; only the guarded
+redirect is asserted.
 
 ## 10. UI decision log
 
@@ -722,19 +751,19 @@ start immediately.
 | Spec | Phase | Note |
 | --- | --- | --- |
 | §1 intent and scope | U0–U10 | The user-facing half of the scope; the staff half moves to §8 here. |
-| §2 scope boundary | all | The "describe it as it is" rule is what makes U3's warning honest and U4's missing identity acceptable. |
+| §2 scope boundary | all | The "describe it as it is" rule is what makes U3's warning honest and keeps U4 to the public DTO. |
 | §3 routes and navigation | **U0** | `/app/*`, `/profile` compatibility redirect, `/:slug`, `/p/:slug`, console 404 that cannot fall through to a slug. |
 | §4 visual and interaction design | **U0** (primitives), **U10** (accessibility sweep) | Extends `Field` to textarea/select/checkbox; reorder by keyboard and touch, no drag-and-drop this pass. |
 | §5 profile and socials | **U1** (+ avatar in **U5**) | Identity, socials, security, account record; forced-rotation, suspended and impersonated handling. |
 | §6 my pages and page editor | **U2**, **U3** (+ **U6** address, **U7** links v2, **U8** drafts, **U9** preview and copy-link) | The editor is built once and extended in place; the phases are the spec's own paragraphs, not new requirements. |
-| §7 public renderer | **U4** (+ identity in **U9**) | Today's DTO has no identity; U4 renders what exists and U9 completes it. |
+| §7 public renderer | **U4** | U4 consumes the public DTO, including identity fields supplied by R1.7. |
 | §8 staff user management | **not in this roadmap** | Post-U10, then R2.7. Requirements stay valid. |
 | §9 settings, audit, service status | **not in this roadmap** | Same. `/app/status` moves with the console. |
 | §10 client architecture and failure handling | **U0** (typed client, `requestList`, feature folders, `useResource`) + **U10** (error matrix) | No production component/state/query library, per the spec. |
 | §11 implementation boundaries | all phases | Web-only changes, plus README/ROADMAP accuracy. No deployment or remote migration. |
 | §12 acceptance 1–2 | **U1** | Identity/socials persist; reorder sends every live id. |
 | §12 acceptance 3–5 | **U2**, **U3** (refined by **U6**–**U8**) | Page/link CRUD, publish/unpublish/delete; the published-page warning; scheduling round-trips and empty bounds. |
-| §12 acceptance 6 | **U4** (identity completed in **U9**) | Public theming, unavailable states, network retry. |
+| §12 acceptance 6 | **U4** | Public theming, identity, unavailable states, network retry. |
 | §12 acceptance 7–9 | **not in this roadmap** | Staff listing, settings, audit. |
 | §12 acceptance 10–12 | **U10** | Session matrix, error matrix, keyboard/dialog/mobile and dirty-form checks. |
 | §12 acceptance 13 | **U0**, **U10** | `/profile` bookmarks and reset links keep resolving; slug collisions have a fallback URL. |

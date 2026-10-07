@@ -51,6 +51,9 @@ publicRoutes.get('/settings', async (c) => {
   for (const [key, value] of Object.entries(settings)) {
     if (PUBLIC_SETTING_KEYS.has(key)) filtered[key] = value
   }
+  if (!(SETTING_KEYS.pagesBaseUrl in filtered)) {
+    filtered[SETTING_KEYS.pagesBaseUrl] = 'https://onelink.local/'
+  }
 
   return ok(c, {
     platformName,

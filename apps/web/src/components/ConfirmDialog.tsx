@@ -42,7 +42,15 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const ref = useRef<HTMLDialogElement>(null)
+  const cancelHandled = useRef(false)
   const titleId = useId()
+
+  const dismiss = () => {
+    if (pending || cancelHandled.current) return
+    cancelHandled.current = true
+    onCancel()
+    window.setTimeout(() => { cancelHandled.current = false }, 0)
+  }
 
   useEffect(() => {
     const dialog = ref.current
@@ -55,11 +63,16 @@ export function ConfirmDialog({
     <dialog
       ref={ref}
       aria-labelledby={titleId}
-      // Escape fires `cancel`; preventing the default keeps the dialog up while
-      // a write is in flight, so the request cannot be abandoned mid-air.
+      // Escape normally closes the native dialog. Only suppress it while a
+      // write is in flight, when abandoning the confirmation would be unsafe.
       onCancel={(event) => {
+        if (pending) event.preventDefault()
+        else dismiss()
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return
         event.preventDefault()
-        if (!pending) onCancel()
+        dismiss()
       }}
       className="m-auto w-[min(34rem,calc(100vw-2rem))] bg-transparent p-0"
     >

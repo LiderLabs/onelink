@@ -84,14 +84,19 @@ the `__Host-` session cookie does not exist.
 | `/login`, `/register` | sign in, create an account |
 | `/forgot-password`, `/reset-password` | the reset flow (generated links use these) |
 | `/` | redirects to `/app` |
-| `/app` | the console; redirects to `/app/profile` until "My pages" lands |
-| `/app/profile` | identity (display name, username, bio, location, pronouns), social links, password change, account record |
-| `/profile` | compatibility redirect to `/app/profile`, for old bookmarks |
-| `/:slug`, `/p/:slug` | the public page — layout only for now; the renderer is a later phase |
+| `/app` | dashboard with profile/social editing, page summary, links and quick actions |
+| `/app/pages`, `/app/pages/new`, `/app/pages/:id` | page list, creation, and editor |
+| `/app#profile-editor`, `/app#socials` | dashboard anchors for the inline profile and social editors |
+| `/app/profile`, `/app/socials` | compatibility redirects to the dashboard editor |
+| `/app/analytics` | honest unavailable-state screen; analytics are not collected |
+| `/app/settings` | existing page/sharing tools and clearly unavailable Release 2 capabilities |
+| `/app/submissions` | no submissions are collected; export is unavailable |
+| `/profile` | compatibility redirect to the dashboard profile editor |
+| `/:slug`, `/p/:slug` | public page renderer |
 | any unmatched path under `/app/` | a console 404 that cannot fall through to a slug |
 
-The profile screen is two resources wearing one screen, and they behave
-differently on purpose:
+The dashboard embeds profile and social editing alongside the page summary and
+links. Those resources still behave differently on purpose:
 
 - **Identity** is `PATCH /api/v1/auth/me` (R1.1/R1.2). Only changed fields are sent,
   an emptied optional box is sent as `null`, and the response is *merged* over the
@@ -109,6 +114,19 @@ differently on purpose:
   for both, and a deliberate refusal is not an error worth rendering. An
   impersonated session may read the links and may not write them.
 
+The dashboard is backed by the owner's page and link DTOs. Its page card offers
+preview/open, copy/share, and publish actions; publish is disabled when the
+published page has no unpublished changes. Link rows show actual saved titles,
+addresses, and visibility, with editing routed to the page editor. Analytics and
+recent activity say “not collected” because views, clicks, and submissions are
+not yet recorded.
+
+The profile preview can switch between mobile and desktop widths. The page
+editor remains focused on page-specific links and design. Link creation and
+editing use a modal with URL metadata suggestions, group assignment, new-tab
+behavior, visibility, scheduling, and optional thumbnail upload. Group filters
+and a separate hidden-links section operate on the current draft.
+
 Unsaved edits are protected in both directions: in-app navigation asks first
 (React Router's blocker, which is why the app mounts `createBrowserRouter`), and
 closing the tab warns. A successful save resets the dirty baseline to the server's
@@ -117,7 +135,7 @@ normalized values, so the second submit diffs against what is actually stored.
 ## Tests and typecheck
 
 ```bash
-npm test          # 242 API tests in 11 files, run in workerd against local D1/R2
+npm test          # 286 API tests in 15 files, run in workerd against local D1/R2
 npm run typecheck # regenerates worker-configuration.d.ts, then typechecks both workspaces
 ```
 
@@ -140,10 +158,10 @@ photo operations. Failed file cleanup has a separate retry control; if upload
 compensation cannot remove an object, a tombstone lets the scheduled cleanup
 retry it.
 
-The top navbar links to **Profile** (`/app/profile`) for the photo, profile
-details, security, and session details, and **Socials** (`/app/socials`) for social
-links and the live preview. The account avatar and username sit at the top right.
-Switching between these pages preserves unsaved drafts.
+The dashboard contains the photo, profile details, security, session details,
+social links, and live preview. The masthead avatar jumps to the editor; old
+`/app/profile` and `/app/socials` bookmarks redirect to the dashboard instead
+of opening separate screens.
 
 The editor's live profile preview follows unsaved name, username, bio,
 location/pronouns, photo crop, and social-link drafts. Hidden socials are omitted;
@@ -176,6 +194,11 @@ npx @playwright/cli run-code --filename=scripts/browser/profile-preview-check.js
 npx @playwright/cli run-code --filename=scripts/browser/profile-preview-social-check.js
 npx @playwright/cli run-code --filename=scripts/browser/profile-navigation-check.js
 ```
+
+The fixture-driven route and failure-state suite runs with `npm run browser:acceptance`.
+It intercepts API requests and does not mutate local D1 data. It checks the session
+redirect boundary but deliberately does not inspect or redesign the sign-in or
+registration page UI.
 
 The flow check creates a disposable local account used by the UI check.
 The state check runs after the flow check and captures mobile and

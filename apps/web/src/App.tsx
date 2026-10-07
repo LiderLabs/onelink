@@ -7,9 +7,13 @@ import { ConsoleNotFoundRoute } from './routes/console-not-found'
 import { ForgotPasswordRoute } from './routes/forgot-password'
 import { LoginRoute } from './routes/login'
 import { NotFoundRoute } from './routes/not-found'
-import { ProfileRoute } from './routes/profile'
 import { RegisterRoute } from './routes/register'
 import { ResetPasswordRoute } from './routes/reset-password'
+import { PageCreateRoute } from './features/pages/PageCreateRoute'
+import { PageEditorRoute } from './features/pages/PageEditorRoute'
+import { PageListRoute } from './features/pages/PageListRoute'
+import { DashboardRoute } from './features/console/DashboardRoute'
+import { AnalyticsRoute, SettingsRoute, SubmissionsRoute } from './features/console/R2Routes'
 import { Navigate } from 'react-router-dom'
 import type { RouteObject } from 'react-router-dom'
 
@@ -28,7 +32,7 @@ import type { RouteObject } from 'react-router-dom'
 //   * everything under `PublicLayout` gets none of it and requires no session.
 //
 // Route ranking, not declaration order, decides the match. That is what makes
-// `/:slug` safe: `/app/profile` and `/login` are static segments and therefore
+// `/:slug` safe: `/app` and `/login` are static segments and therefore
 // outrank a dynamic one, so a public slug can never shadow a console screen.
 // Within `/app`, a `*` child catches every unmatched console path, which is what
 // keeps `/app/typo` from falling through to a slug lookup — the fall-through the
@@ -61,11 +65,16 @@ export const routes: RouteObject[] = [
           {
             element: <ConsoleLayout />,
             children: [
-              // U2 turns this into "My pages"; until that screen exists, sending
-              // someone to a list that is not there would be a worse start.
-              { index: true, element: <Navigate to="/app/profile" replace /> },
-              // One persistent editor preserves drafts across the two navbar destinations.
-              { element: <ProfileRoute />, children: [{ path: 'profile', element: <></> }, { path: 'socials', element: <></> }] },
+              { index: true, element: <DashboardRoute /> },
+              // Older account URLs remain aliases; editing now lives on Dashboard.
+              { path: 'profile', element: <Navigate to="/app#profile-editor" replace /> },
+              { path: 'socials', element: <Navigate to="/app#socials" replace /> },
+              { path: 'analytics', element: <AnalyticsRoute /> },
+              { path: 'settings', element: <SettingsRoute /> },
+              { path: 'submissions', element: <SubmissionsRoute /> },
+              { path: 'pages', element: <PageListRoute /> },
+              { path: 'pages/new', element: <PageCreateRoute /> },
+              { path: 'pages/:id', element: <PageEditorRoute /> },
               { path: '*', element: <ConsoleNotFoundRoute /> },
             ],
           },
@@ -75,7 +84,7 @@ export const routes: RouteObject[] = [
       // Kept for bookmarks: `/profile` was the account screen before the console
       // namespace existed. A `profile` slug is still served at `/p/profile`, so
       // this alias costs one public address, not every one of them.
-      { path: '/profile', element: <Navigate to="/app/profile" replace /> },
+      { path: '/profile', element: <Navigate to="/app#profile-editor" replace /> },
       { path: '/', element: <Navigate to="/app" replace /> },
       { path: '*', element: <NotFoundRoute /> },
     ],

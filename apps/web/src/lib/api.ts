@@ -25,6 +25,7 @@ import type {
 // ============================================================================
 
 const BASE = '/api/v1'
+export const SESSION_EXPIRED_EVENT = 'onelink:session-expired'
 
 /** Codes the API itself emits (mirrors src/lib/errors.ts on the server). */
 export type ApiErrorCode =
@@ -167,7 +168,12 @@ export function fieldErrorsFrom(error: unknown): Record<string, string> {
  * Exported because feature clients (`features/<name>/api.ts`) build their own
  * endpoints on top of it rather than every resource being bolted into this file.
  */
-export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+interface ApiEnvelope<T> {
+  data: T
+  meta?: Record<string, unknown>
+}
+
+async function requestEnvelope<T>(path: string, init: RequestInit = {}): Promise<ApiEnvelope<T> | null> {
   let response: Response
   try {
     response = await fetch(`${BASE}${path}`, {
@@ -184,7 +190,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     throw new ApiError(0, 'NETWORK', 'OneLink could not be reached.')
   }
 
-  if (response.status === 204) return undefined as T
+  if (response.status === 204) return null
 
   let raw: string
   try {
@@ -203,16 +209,53 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   }
 
   if (!response.ok) {
-    throw apiErrorFromResponse(response.status, response.headers, payload)
+    const error = apiErrorFromResponse(response.status, response.headers, payload)
+    if (error.code === 'UNAUTHENTICATED' && !path.startsWith('/auth/') && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
+    }
+    throw error
   }
 
-  if (payload === null) {
+  if (typeof payload !== 'object' || payload === null || !('data' in payload)) {
     throw new ApiError(response.status, 'UNKNOWN', 'The server returned an unreadable body.')
   }
 
-  // Every successful response is `{ data, meta }`; unwrap it here so callers
-  // only ever deal with the resource itself.
-  return (payload as { data: T }).data
+  return payload as ApiEnvelope<T>
+}
+
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await requestEnvelope<T>(path, init)
+  return response === null ? undefined as T : response.data
+}
+
+export interface ListResponse<T> {
+  items: T[]
+  meta: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+}
+
+/** Read a paginated list without discarding the API's pagination authority. */
+export async function requestList<T>(path: string, init: RequestInit = {}): Promise<ListResponse<T>> {
+  const response = await requestEnvelope<T[]>(path, init)
+  const meta = response?.meta
+  if (
+    response === null ||
+    !Array.isArray(response.data) ||
+    typeof meta?.page !== 'number' ||
+    typeof meta.limit !== 'number' ||
+    typeof meta.total !== 'number' ||
+    typeof meta.totalPages !== 'number'
+  ) {
+    throw new ApiError(200, 'UNKNOWN', 'The server returned an invalid paginated response.')
+  }
+  return {
+    items: response.data,
+    meta: { page: meta.page, limit: meta.limit, total: meta.total, totalPages: meta.totalPages },
+  }
 }
 
 export const api = {

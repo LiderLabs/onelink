@@ -204,3 +204,161 @@ export interface UpdateSocialInput {
   url?: string
   isVisible?: boolean
 }
+
+// -------------------------------------------------------------------- pages --
+
+export type PageTheme = 'light' | 'dark'
+export type PageLayout = 'list' | 'grid'
+export type PageStatus = 'draft' | 'published' | 'archived'
+export type ModerationStatus = 'visible' | 'under_review' | 'removed'
+
+export interface OwnerPage {
+  id: string
+  slug: string
+  title: string | null
+  bio: string | null
+  theme: PageTheme
+  layout: PageLayout
+  accentColor: string | null
+  showBranding: boolean
+  status: PageStatus
+  moderationStatus: ModerationStatus
+  visibility: string
+  revision: number | null
+  unpublishedChanges: boolean
+  publishedAt: number | null
+  createdAt: number
+  updatedAt: number
+  deletedAt: number | null
+}
+
+export interface PageLink {
+  id: string
+  title: string
+  url: string
+  domain: string | null
+  description: string | null
+  icon: string | null
+  position: number
+  isVisible: boolean
+  startsAt: number | null
+  endsAt: number | null
+  groupId: string | null
+  openInNewTab: boolean
+  thumbnailKey: string | null
+  status: 'scheduled' | 'active' | 'expired'
+  createdAt: number
+  updatedAt: number
+}
+
+export interface OwnerPageDetail {
+  page: OwnerPage
+  links: PageLink[]
+}
+
+export interface PageListMeta {
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
+export interface CreatePageInput {
+  slug?: string
+  title?: string
+  bio?: string
+  theme?: PageTheme
+  layout?: PageLayout
+  accentColor?: string | null
+  showBranding?: boolean
+}
+
+export interface UpdatePageInput {
+  slug?: string
+  title?: string | null
+  bio?: string | null
+  theme?: PageTheme
+  layout?: PageLayout
+  accentColor?: string | null
+  showBranding?: boolean
+}
+
+export interface PageLinkInput {
+  title: string
+  url: string
+  description?: string | null
+  icon?: string | null
+  isVisible?: boolean
+  startsAt?: number | null
+  endsAt?: number | null
+  groupId?: string | null
+  openInNewTab?: boolean
+  thumbnailKey?: string | null
+}
+
+export interface LinkGroup {
+  id: string
+  name: string
+  position: number
+}
+
+export interface PageDraftContent {
+  v: 1
+  page: {
+    title: string | null
+    bio: string | null
+    theme: PageTheme
+    layout: PageLayout
+    accentColor: string | null
+    showBranding: boolean
+  }
+  groups: Array<{ id?: string; name: string }>
+  links: Array<{
+    id?: string
+    title: string
+    url: string
+    description: string | null
+    icon: string | null
+    isVisible: boolean
+    groupId: string | null
+    openInNewTab: boolean
+    thumbnailKey: string | null
+    startsAt: number | null
+    endsAt: number | null
+  }>
+}
+
+export interface PageDraftState {
+  content: PageDraftContent
+  updatedAt: number | null
+  unpublishedChanges: boolean
+}
+
+export interface PageRevision {
+  revision: number
+  reason: string
+  createdAt: number
+}
+
+export interface PublicPageOwner {
+  username: string
+  displayName: string
+  avatarUrl: string | null
+  bio: string | null
+  location: string | null
+  pronouns: string | null
+  socials: Array<{ platform: SocialPlatform; url: string; position: number }>
+}
+
+export interface PublicPageDto {
+  slug: string
+  title: string | null
+  bio: string | null
+  theme: PageTheme
+  layout: PageLayout
+  accentColor: string | null
+  showBranding: boolean
+  owner: PublicPageOwner
+  links: PageLink[]
+  groups: Array<{ id: string; name: string; position: number }>
+}

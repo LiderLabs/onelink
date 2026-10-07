@@ -50,3 +50,67 @@ export function uploadAvatar(blob: Blob, options: {
     xhr.send(blob)
   })
 }
+
+export function uploadPageImage(file: File, options: {
+  signal?: AbortSignal; onProgress?: (fraction: number) => void
+}): Promise<MediaAsset> {
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type.toLowerCase())) {
+    return Promise.reject(new ApiError(422, 'VALIDATION_ERROR', 'Choose a JPEG, PNG, or WebP image.'))
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    return Promise.reject(new ApiError(422, 'VALIDATION_ERROR', 'Choose an image smaller than 10 MB.'))
+  }
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    let settled = false
+    const abort = () => xhr.abort()
+    const finish = (callback: () => void) => {
+      if (settled) return
+      settled = true
+      options.signal?.removeEventListener('abort', abort)
+      callback()
+    }
+    const query = new URLSearchParams({ kind: 'page_image', filename: file.name })
+    xhr.open('POST', `/api/v1/media?${query}`)
+    xhr.withCredentials = true
+    xhr.timeout = 30_000
+    xhr.setRequestHeader('Content-Type', file.type)
+    xhr.setRequestHeader('Accept', 'application/json')
+    xhr.upload.onprogress = event => {
+      if (!settled && event.lengthComputable && event.total > 0) {
+        options.onProgress?.(Math.max(0, Math.min(1, event.loaded / event.total)))
+      }
+    }
+    xhr.onerror = () => finish(() => reject(new ApiError(0, 'NETWORK', 'OneLink could not be reached.')))
+    xhr.ontimeout = () => finish(() => reject(new ApiError(0, 'NETWORK', 'The image upload timed out. Please try again.')))
+    xhr.onabort = () => finish(() => reject(new ApiError(0, 'NETWORK', 'The image upload was cancelled.')))
+    xhr.onload = () => finish(() => {
+      let payload: unknown
+      try { payload = JSON.parse(xhr.responseText) } catch { payload = null }
+      const headers = new Headers()
+      for (const line of xhr.getAllResponseHeaders().trim().split(/[\r\n]+/)) {
+        const colon = line.indexOf(':')
+        if (colon > 0) headers.append(line.slice(0, colon), line.slice(colon + 1).trim())
+      }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(apiErrorFromResponse(xhr.status, headers, payload))
+        return
+      }
+      const media = (payload as { data?: MediaAsset } | null)?.data
+      if (!media?.id || !media.key || !media.url) {
+        reject(new ApiError(xhr.status, 'UNKNOWN', 'The server returned an unreadable image.'))
+        return
+      }
+      resolve(media)
+    })
+    if (options.signal?.aborted) {
+      finish(() => reject(new ApiError(0, 'NETWORK', 'The image upload was cancelled.')))
+      return
+    }
+    options.signal?.addEventListener('abort', abort, { once: true })
+    xhr.send(file)
+  })
+}
+
+export const deleteMediaAsset = (id: string): Promise<void> =>
+  request(`/media/${encodeURIComponent(id)}`, { method: 'DELETE' })

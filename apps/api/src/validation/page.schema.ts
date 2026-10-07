@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { MAX_SLUG_LENGTH, MAX_URL_LENGTH } from '../lib/constants'
-import { idParamSchema } from './common'
+import { PAGE_IMAGE_KEY_PATTERN, MAX_MEDIA_KEY_LENGTH } from '../lib/media'
+import { idParamSchema, ULID_PATTERN } from './common'
 
 // ============================================================================
 // Request bodies for /api/v1/pages and the page half of /api/v1/public.
@@ -55,6 +56,7 @@ export const createPageSchema = z.strictObject({
 
 export const updatePageSchema = z
   .strictObject({
+    slug: slugInputSchema.optional(),
     title: z.string().trim().max(120).nullable().optional(),
     bio: z.string().trim().max(500).nullable().optional(),
     theme: themeSchema.optional(),
@@ -71,6 +73,13 @@ const linkUrlSchema = z
   .trim()
   .min(1, 'A link URL is required.')
   .max(MAX_URL_LENGTH, `Link URLs must be at most ${MAX_URL_LENGTH} characters.`)
+
+const linkGroupIdSchema = idParamSchema.shape.id
+const thumbnailKeySchema = z.string().trim().max(MAX_MEDIA_KEY_LENGTH).regex(
+  PAGE_IMAGE_KEY_PATTERN,
+  'Choose a page-image key uploaded to this account.',
+)
+const linkGroupNameSchema = z.string().trim().min(1, 'A group name is required.').max(80)
 
 const scheduleRefinement = {
   error: 'The link window ends before it starts.',
@@ -95,6 +104,9 @@ export const createPageLinkSchema = z
       .nullable()
       .optional(),
     isVisible: z.boolean().optional(),
+    groupId: linkGroupIdSchema.nullable().optional(),
+    openInNewTab: z.boolean().optional(),
+    thumbnailKey: thumbnailKeySchema.nullable().optional(),
     startsAt: z.number().int().min(0).nullable().optional(),
     endsAt: z.number().int().min(0).nullable().optional(),
   })
@@ -112,6 +124,9 @@ export const updatePageLinkSchema = z
       .nullable()
       .optional(),
     isVisible: z.boolean().optional(),
+    groupId: linkGroupIdSchema.nullable().optional(),
+    openInNewTab: z.boolean().optional(),
+    thumbnailKey: thumbnailKeySchema.nullable().optional(),
     startsAt: z.number().int().min(0).nullable().optional(),
     endsAt: z.number().int().min(0).nullable().optional(),
   })
@@ -131,8 +146,75 @@ export const reorderPageLinksSchema = z.strictObject({
     .max(200, 'Too many link ids in one request.'),
 })
 
+export const createLinkGroupSchema = z.strictObject({ name: linkGroupNameSchema })
+export const updateLinkGroupSchema = z.strictObject({ name: linkGroupNameSchema })
+  .refine((value) => Object.keys(value).length > 0, {
+    error: 'Supply at least one field to update.',
+  })
+export const reorderLinkGroupsSchema = z.strictObject({
+  groupIds: z.array(linkGroupIdSchema).max(100, 'Too many groups in one request.'),
+})
+
+export const bulkPageLinksSchema = z.strictObject({
+  ids: z.array(idParamSchema.shape.id).min(1).max(200),
+  action: z.enum(['hide', 'show', 'delete', 'move']),
+  groupId: linkGroupIdSchema.nullable().optional(),
+}).refine(value => value.action === 'move' ? 'groupId' in value : !('groupId' in value), {
+  error: 'Supply groupId only when moving links.',
+  path: ['groupId'],
+})
+
+export const linkMetadataSchema = z.strictObject({ url: linkUrlSchema })
+
+const draftGroupSchema = z.strictObject({
+  id: z.string().regex(ULID_PATTERN).optional(),
+  name: linkGroupNameSchema,
+})
+
+const draftLinkSchema = z
+  .strictObject({
+    id: z.string().regex(ULID_PATTERN).optional(),
+    title: linkTitleSchema,
+    url: linkUrlSchema,
+    description: z.string().trim().max(280).nullable().optional(),
+    icon: z.string().trim().max(80).nullable().optional(),
+    isVisible: z.boolean(),
+    groupId: z.string().regex(ULID_PATTERN).nullable().optional(),
+    openInNewTab: z.boolean(),
+    thumbnailKey: thumbnailKeySchema.nullable().optional(),
+    startsAt: z.number().int().min(0).nullable(),
+    endsAt: z.number().int().min(0).nullable(),
+  })
+  .refine(windowIsOrdered, scheduleRefinement)
+
+export const pageDraftContentSchema = z.strictObject({
+  v: z.literal(1),
+  page: z.strictObject({
+    title: z.string().trim().max(120).nullable(),
+    bio: z.string().trim().max(500).nullable(),
+    theme: themeSchema,
+    layout: layoutSchema,
+    accentColor: accentColorSchema.nullable(),
+    showBranding: z.boolean(),
+  }),
+  groups: z.array(draftGroupSchema).max(100),
+  links: z.array(draftLinkSchema).max(200),
+})
+
+export const pageDraftInputSchema = z.strictObject({
+  content: pageDraftContentSchema,
+  updatedAt: z.number().int().min(0).nullable(),
+})
+
 export type CreatePageBody = z.infer<typeof createPageSchema>
 export type UpdatePageBody = z.infer<typeof updatePageSchema>
 export type CreatePageLinkBody = z.infer<typeof createPageLinkSchema>
 export type UpdatePageLinkBody = z.infer<typeof updatePageLinkSchema>
 export type ReorderPageLinksBody = z.infer<typeof reorderPageLinksSchema>
+export type CreateLinkGroupBody = z.infer<typeof createLinkGroupSchema>
+export type UpdateLinkGroupBody = z.infer<typeof updateLinkGroupSchema>
+export type ReorderLinkGroupsBody = z.infer<typeof reorderLinkGroupsSchema>
+export type BulkPageLinksBody = z.infer<typeof bulkPageLinksSchema>
+export type LinkMetadataBody = z.infer<typeof linkMetadataSchema>
+export type PageDraftContent = z.infer<typeof pageDraftContentSchema>
+export type PageDraftInput = z.infer<typeof pageDraftInputSchema>

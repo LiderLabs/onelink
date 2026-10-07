@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiError, errorMessageFor } from '../lib/api'
 import { Button } from './Button'
 import { Notice } from './Notice'
@@ -24,15 +24,23 @@ export interface ErrorNoticeProps {
 }
 
 export function ErrorNotice({ error, action, onRetry, delay = 0 }: ErrorNoticeProps) {
-  const [retrying, setRetrying] = useState(false)
+  const retryAfter = error instanceof ApiError ? error.retryAfterSeconds : null
+  const [secondsRemaining, setSecondsRemaining] = useState(retryAfter ?? 0)
 
-  const retry = () => {
-    setRetrying(true)
-    // `onRetry` bumps a counter rather than returning a promise, so the pending
-    // state clears on a timer instead of on a resolution that may never come.
-    onRetry()
-    window.setTimeout(() => setRetrying(false), 500)
-  }
+  useEffect(() => {
+    if (retryAfter === null || retryAfter <= 0) {
+      setSecondsRemaining(0)
+      return
+    }
+    const deadline = Date.now() + retryAfter * 1000
+    const update = () => setSecondsRemaining(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)))
+    update()
+    const timer = window.setInterval(update, 1000)
+    return () => window.clearInterval(timer)
+  }, [error, retryAfter])
+
+  const retryable = !(error instanceof ApiError) ||
+    error.status === 0 || error.status === 408 || error.status === 429 || error.status >= 500
 
   return (
     <Notice
@@ -42,11 +50,17 @@ export function ErrorNotice({ error, action, onRetry, delay = 0 }: ErrorNoticePr
       className="mt-5"
     >
       <p>{errorMessageFor(error)}</p>
-      <div className="mt-3">
-        <Button variant="outline" onClick={retry} pending={retrying} pendingLabel="Retrying">
-          {action}
-        </Button>
-      </div>
+      {retryable ? (
+        <div className="mt-3">
+          <Button
+            variant="outline"
+            disabled={secondsRemaining > 0}
+            onClick={onRetry}
+          >
+            {secondsRemaining > 0 ? `${action} in ${secondsRemaining}s` : action}
+          </Button>
+        </div>
+      ) : null}
     </Notice>
   )
 }

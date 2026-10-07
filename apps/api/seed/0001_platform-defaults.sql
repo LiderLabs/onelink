@@ -27,6 +27,7 @@ INSERT OR IGNORE INTO settings (key, value, type, label, grp, description, is_pu
   ('moderation.report_cooldown_minutes', '0',     'number',  'Per-reporter cooldown',  'moderation', 'Minutes a reporter must wait between reports.', 0, 1735689600000),
 
   ('content.max_links_per_page', '50', 'number', 'Max links per page', 'content', 'Upper bound on page_links rows.', 1, 1735689600000),
+  ('content.trash_retention_days', '30', 'number', 'Link trash retention (days)', 'content', 'How long soft-deleted page links remain recoverable.', 0, 1735689600000),
   -- S3 (R1.0): the console lives under /app/*, so `app` is reserved alongside
   -- the SPA's own paths. `INSERT OR IGNORE` means a database that already has
   -- this row keeps the list it has, so an operator upgrading an existing
@@ -59,6 +60,14 @@ INSERT OR IGNORE INTO email_templates (key, subject, body_text, variables, enabl
    '{{inviter_name}} invited you to join {{platform_name}} as {{role}}.' || char(10) || char(10) ||
    '{{invite_url}}' || char(10) || char(10) || 'This invite expires in {{expires_in}}.',
    '["platform_name","inviter_name","role","invite_url","expires_in"]', 1, 1735689600000),
+
+  ('page_invitation',
+   'You have been invited to collaborate on a {{platform_name}} page',
+   'Hi,' || char(10) || char(10) ||
+   '{{inviter_name}} invited you to collaborate on "{{page_name}}" as a {{role}}.' || char(10) || char(10) ||
+   'Sign in to review and accept the invitation:' || char(10) || '{{invite_url}}' ||
+   char(10) || char(10) || 'This invite expires in {{expires_in}}.',
+   '["platform_name","inviter_name","page_name","role","invite_url","expires_in"]', 1, 1735689600000),
 
   ('warning_issued',
    'A warning was issued on your {{platform_name}} account',
@@ -106,7 +115,8 @@ INSERT OR IGNORE INTO rate_limits (key, scope, max_requests, window_seconds, act
   -- profile form spend the allowance an editor needs. `block`, because a profile
   -- write is a deliberate human action with nothing to degrade to.
   ('profile_write_user', 'user',   60,   3600, 'block',    1, 1735689600000),
+  -- Autosave is allowed to degrade; the dedicated route turns throttle depletion into a soft 429.
+  ('page_autosave_user','user',  1200,   3600, 'throttle', 1, 1735689600000),
   ('report_create_ip',   'ip',     10,   3600, 'block',    1, 1735689600000),
   ('media_upload_user',  'user',   60,   3600, 'throttle', 1, 1735689600000),
   ('api_global',         'global', 6000, 60,   'throttle', 1, 1735689600000);
-
