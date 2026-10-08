@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { createPortal } from 'react-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../../components/Button'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { EmptyState } from '../../components/EmptyState'
@@ -9,7 +10,14 @@ import { Notice } from '../../components/Notice'
 import { Splash } from '../../components/StatusScreens'
 import { ApiError, errorMessageFor, fieldErrorsFrom } from '../../lib/api'
 import { useUnsavedChanges } from '../../lib/dirty-form'
-import type { LinkGroup, OwnerPageDetail, PageDraftContent, PageDraftState, PageLink, PageLinkInput, PageRevision, PublicPageDto, UpdatePageInput } from '../../lib/types'
+import { useSession } from '../../lib/session'
+import type { LinkGroup, OwnerPageDetail, PageDraftContent, PageDraftState, PageLink, PageLinkInput, PageRevision, PublicPageDto, PublicPageOwner, UpdatePageInput } from '../../lib/types'
+import { CreatorPreview, draftModel } from '../creator/CreatorPreview'
+import { ProfilePhotoEditor } from '../profile/ProfilePhotoEditor'
+import { SocialsEditor } from '../profile/SocialsEditor'
+import type { PreviewPhoto, PreviewSocials } from '../profile/ProfilePreview'
+import '../profile/profile.css'
+import '../creator/creator-editor.css'
 import { deleteMediaAsset, uploadPageImage } from '../media/api'
 import type { MediaAsset } from '../media/types'
 import { QrCodeTools } from './QrCodeTools'
@@ -133,6 +141,22 @@ function valuesForLink(link: PageLink): LinkValues {
 export function PageEditorRoute() {
   const { id = '' } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const session = useSession()
+  const [tab, setTab] = useState<'profile' | 'links' | 'design' | 'publish'>('profile')
+  const [actionHost, setActionHost] = useState<HTMLElement | null>(null)
+  const [previewOwner, setPreviewOwner] = useState<PublicPageOwner | null>(null)
+  const [photo, setPhoto] = useState<PreviewPhoto | null>(null)
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const [socialPreview, setSocialPreview] = useState<PreviewSocials>({ links: [], loading: true, unavailable: false })
+  const [socialState, setSocialState] = useState({ pending: false, dirty: false })
+  const [, refreshClock] = useState(0)
+  useEffect(() => {
+    setActionHost(document.getElementById('creator-page-actions'))
+    const timer = window.setInterval(() => refreshClock(value => value + 1), 15000)
+    return () => clearInterval(timer)
+  }, [id])
+  const shortcutHandled = useRef<string | null>(null)
   const [detail, setDetail] = useState<OwnerPageDetail | null>(null)
   const [liveLinks, setLiveLinks] = useState<PageLink[]>([])
   const [draft, setDraft] = useState<PageDraftState | null>(null)
@@ -200,6 +224,20 @@ export function PageEditorRoute() {
   const [metadataSuggestion, setMetadataSuggestion] = useState<{ url: string; title: string | null; description: string | null } | null>(null)
 
   useEffect(() => {
+    if (!draftReady || shortcutHandled.current === location.key) return
+    shortcutHandled.current = location.key
+    const query = new URLSearchParams(location.search)
+    const section = query.get('tab')
+    setTab(section === 'links' ? 'links' : section === 'publish' || query.get('qr') === '1' || location.hash === '#publish-heading' ? 'publish' : section === 'design' || location.hash === '#appearance-heading' ? 'design' : 'profile')
+    if (query.get('qr') === '1') setQrOpen(true)
+    if (query.get('add') === '1') {
+      setEditingLink(null); setLinkValues(EMPTY_LINK); setLinkBaseline(EMPTY_LINK); setLinkError(null); setLinkOpen(true)
+    }
+    const heading = query.get('tab') === 'links' ? 'links-heading' : query.get('tab') === 'publish' ? 'publish-heading' : location.hash.slice(1)
+    if (heading) window.requestAnimationFrame(() => document.getElementById(heading)?.scrollIntoView({ block: 'start' }))
+  }, [draftReady, location.key, location.search, location.hash])
+
+  useEffect(() => {
     const dialog = linkDialogRef.current
     if (!dialog) return
     if (linkOpen && !dialog.open) {
@@ -213,6 +251,7 @@ export function PageEditorRoute() {
   useEffect(() => {
     let current = true
     setDetail(null)
+    setPreviewOwner(null); setPhoto(null); setPhotoBusy(false); setSocialState({ pending: false, dirty: false })
     setLoadError(null)
     setPageValues(null)
     setDraft(null)
@@ -336,7 +375,7 @@ export function PageEditorRoute() {
       }).catch((cause: unknown) => {
         setDraftError(cause)
         setDraftStatus('error')
-        if (cause instanceof ApiError && cause.status === 409) {
+        if (cause instanceof ApiError && ['CONFLICT', 'PRECONDITION_FAILED'].includes(cause.code)) {
           void getPageDraft(id).then(({ draft: latest }) => {
             setDraftConflict(latest)
           }).catch((reloadError: unknown) => {
@@ -360,7 +399,8 @@ export function PageEditorRoute() {
   const draftDirty = detail !== null && pageValues !== null && draft !== null &&
     JSON.stringify(draftContentFor(detail, pageValues, groups)) !== JSON.stringify(draft.content)
   const linkDirty = linkOpen && JSON.stringify(linkValues) !== JSON.stringify(linkBaseline)
-  const navigation = useUnsavedChanges(Boolean(draftDirty || linkDirty || draftStatus === 'error'))
+  const accountUnsaved = photo !== null || photoBusy || socialState.dirty || socialState.pending
+  const navigation = useUnsavedChanges(Boolean(pageDirty || draftDirty || linkDirty || draftStatus === 'error' || accountUnsaved))
 
   useEffect(() => {
     if (!draftReady || !draft || !detail || draftDirty || draftStatus !== 'saved') return
@@ -368,7 +408,7 @@ export function PageEditorRoute() {
     setPreviewPending(true)
     setPreviewError(null)
     void getPagePreview(id).then(({ page }) => {
-      if (current) setServerPreview(page)
+      if (current) { setServerPreview(page); setPreviewOwner(page.owner) }
     }).catch((cause: unknown) => {
       if (current) setPreviewError(cause)
     }).finally(() => {
@@ -704,7 +744,7 @@ export function PageEditorRoute() {
   }
 
   const changePublication = async (action: 'publish' | 'unpublish', publishLastSaved = false) => {
-    if (!detail || linkDirty) return
+    if (!detail || linkDirty || accountUnsaved || slugValue.trim().toLowerCase() !== detail.page.slug.toLowerCase()) return
     if (action === 'publish' && draftDirty && draftStatus === 'error' && !publishLastSaved) {
       setPublishSavedDraftOpen(true)
       return
@@ -802,6 +842,7 @@ export function PageEditorRoute() {
     try {
       const result = await getPagePreview(id)
       setServerPreview(result.page)
+      setPreviewOwner(result.page.owner)
     } catch (cause) {
       setPreviewError(cause)
     } finally {
@@ -914,7 +955,28 @@ export function PageEditorRoute() {
   }
 
   if (!pageValues) return <Splash label="Preparing the editor" />
-  const hasUnsaved = Boolean(draftDirty || linkDirty || draftStatus !== 'saved')
+  const hasUnsaved = Boolean(pageDirty || draftDirty || linkDirty || accountUnsaved || draftStatus !== 'saved')
+  const owner = previewOwner ?? serverPreview?.owner
+  const ownsProfile = Boolean(owner && owner.username === session.user?.username)
+  const accountReadable = Boolean(ownsProfile && session.user?.status === 'active' && !session.mustChangePassword)
+  const accountWritable = accountReadable && session.user?.impersonatedBy === null
+  const liveOwner = owner && ownsProfile && session.user ? {
+    ...owner,
+    displayName: session.user.displayName,
+    avatarUrl: session.user.avatarUrl,
+    bio: session.user.bio,
+    location: session.user.location,
+    pronouns: session.user.pronouns,
+    socials: !socialPreview.loading && !socialPreview.unavailable
+      ? socialPreview.links.filter(link => link.isVisible) : owner.socials,
+  } : owner
+  const livePreview = liveOwner ? draftModel(detail.page.slug, draftContentFor(detail, pageValues, groups), liveOwner) : null
+  const editorActions = <>
+    <span className="creator-editor-save-state" data-unsaved={hasUnsaved} role="status">{draftStatus === 'error' ? 'Save needs attention' : draftStatus === 'saving' ? 'Saving…' : hasUnsaved ? 'Unsaved changes' : 'All changes saved'}</span>
+    <button type="button" className="creator-button" disabled={draftStatus === 'saving' || Boolean(draftConflict)} onClick={() => setDraftRetry(value => value + 1)}>Save draft</button>
+    <button type="button" className="creator-button" onClick={() => { setTab('publish'); void openRevisionHistory() }}>History</button>
+    <button type="button" className="creator-button creator-button-primary" disabled={hasUnsaved || actionPending !== null || detail.page.moderationStatus !== 'visible' || (detail.page.status === 'published' && !draft?.unpublishedChanges)} onClick={() => void changePublication('publish')}>{actionPending === 'publish' ? 'Publishing…' : 'Publish'}</button>
+  </>
   const publicUrl = new URL(publicPagePath(detail.page.slug), window.location.origin).href
   const revisionPreview = revisionDetail ? {
     slug: detail.page.slug,
@@ -933,42 +995,17 @@ export function PageEditorRoute() {
   } : null
 
   return (
-    <section className="mx-auto max-w-7xl">
-      <div className="flex flex-wrap items-start justify-between gap-6 border-b border-ink pb-6">
+    <section className="creator-page-editor creator-legacy">
+      {actionHost ? createPortal(editorActions, actionHost) : <div className="creator-page-actions">{editorActions}</div>}
+      <div className="creator-editor-heading">
         <div>
-          <Link to="/app/pages" className="eyebrow underline underline-offset-4">← My pages</Link>
-          <p className="eyebrow mt-6">Editor <span className="px-1">/</span> {detail.page.status}</p>
-          <h1 className="mt-2 max-w-3xl wrap-break-word font-display text-3xl font-medium tracking-tight sm:text-4xl">{pageValues.title.trim() || detail.page.slug}</h1>
-          <p className="mt-2 font-mono text-xs text-ink-soft">/{detail.page.slug} <span className="px-1">·</span> {detail.page.revision ? `Revision ${detail.page.revision}` : 'Never published'}</p>
+          <p className="creator-eyebrow">Build your presence</p>
+          <h1>Your page, your way.</h1>
+          <p>Everything you need to make your OneLink page feel like you.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" variant="outline" disabled={!draft?.unpublishedChanges || draftActionPending} onClick={() => setDiscardDraftOpen(true)}>Discard</Button>
-          <Button type="button" variant="outline" onClick={() => document.querySelector('[aria-label="Page preview"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Preview</Button>
-          {detail.page.status === 'published' ? <Button type="button" variant="outline" onClick={() => void sharePublicPage()}>Share</Button> : null}
-          <Button
-            type="button"
-            disabled={!draft?.unpublishedChanges || hasUnsaved || actionPending !== null || detail.page.moderationStatus !== 'visible'}
-            pending={actionPending === 'publish'}
-            onClick={() => void changePublication('publish')}
-          >
-            Publish{draft?.unpublishedChanges ? <span className="text-[#d3a84c]" aria-label="Unpublished changes">●</span> : null}
-          </Button>
-          {detail.page.status === 'published' ? (
-            <a href={publicPagePath(detail.page.slug)} target="_blank" rel="noreferrer" className="min-h-11 content-center px-2 font-mono text-[0.6875rem] uppercase tracking-[0.12em] underline underline-offset-4">Open ↗</a>
-          ) : null}
-          <Button variant="outline" onClick={() => setDeletingPage(true)}>Delete</Button>
-        </div>
+        <span className={`creator-badge ${draft?.unpublishedChanges || detail.page.status !== 'published' ? 'creator-badge-private' : 'creator-badge-live'}`}>{draft?.unpublishedChanges ? 'Unpublished changes' : detail.page.status === 'published' ? 'Page live' : 'Draft · private'}</span>
       </div>
-
-      <nav aria-label="Page editor sections" className="mt-4 overflow-x-auto border-b border-rule">
-        <ul className="flex min-w-max items-center gap-5 py-3 font-mono text-[0.6875rem] uppercase tracking-[0.12em]">
-          <li><Link to="/app#profile-editor" className="text-ink-soft underline-offset-4 hover:text-ink hover:underline">Profile</Link></li>
-          <li><a href="#links-heading" className="underline underline-offset-4">Links</a></li>
-          <li><a href="#appearance-heading" className="text-ink-soft underline-offset-4 hover:text-ink hover:underline">Design</a></li>
-          <li><Link to="/app/analytics" className="text-ink-soft underline-offset-4 hover:text-ink hover:underline">Analytics</Link></li>
-          <li><a href="#page-address" className="text-ink-soft underline-offset-4 hover:text-ink hover:underline">Settings</a></li>
-        </ul>
-      </nav>
+      <div className="creator-notice">Page edits autosave to your private draft. Publish when you’re ready to update your page. <Link to="/app/pages" className="creator-muted-link">My pages →</Link></div>
 
       {shareMessage ? <p role="status" className="mt-3 text-sm text-ink-soft">{shareMessage}</p> : null}
       {shareError ? <p role="alert" className="mt-3 text-sm text-danger">{shareError}</p> : null}
@@ -976,16 +1013,6 @@ export function PageEditorRoute() {
       {detail.page.moderationStatus !== 'visible' ? (
         <Notice tone="warning" label={`Moderation: ${detail.page.moderationStatus}`} className="mt-6">
           This page cannot be published until its moderation status permits it.
-        </Notice>
-      ) : null}
-      {detail.page.status === 'published' ? (
-        <Notice tone="info" label="Draft first">
-          Your edits autosave privately. Publish when you are ready to replace the live page.
-        </Notice>
-      ) : null}
-      {draft?.unpublishedChanges ? (
-        <Notice tone="info" label="Unpublished changes">
-          Your saved draft differs from the live version.
         </Notice>
       ) : null}
       {draftError ? (
@@ -1007,28 +1034,47 @@ export function PageEditorRoute() {
         </div>
       ) : null}
 
-      <div className="mt-7 grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
-        <div className="space-y-7">
-          <form onSubmit={(event) => void savePage(event)} className="space-y-5 border border-rule bg-white/80 p-5 sm:p-6">
-            <div className="flex items-end justify-between gap-3 border-b border-rule pb-3">
-              <div><p className="eyebrow">01 · Composition</p><h2 id="appearance-heading" className="mt-1 font-display text-2xl">Page appearance</h2></div>
-              {pageDirty ? <span className="eyebrow">Unsaved</span> : <span className="eyebrow text-ink-faint">Saved</span>}
-            </div>
-            <div id="page-address">
+      <div className="creator-editor-grid">
+        <div className="creator-editor-content">
+          <div className="creator-editor-tabs" role="tablist" aria-label="Page editor sections">
+            {(['profile', 'links', 'design', 'publish'] as const).map((value, index, tabs) => <button key={value} type="button" role="tab" id={`editor-tab-${value}`} aria-controls={`editor-panel-${value}`} aria-selected={tab === value} tabIndex={tab === value ? 0 : -1} onClick={() => setTab(value)} onKeyDown={event => {
+              const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : null
+              const nextTab = next === null ? undefined : tabs[next]
+              if (nextTab) { event.preventDefault(); setTab(nextTab); document.getElementById(`editor-tab-${nextTab}`)?.focus() }
+            }}>{value === 'publish' ? 'Publishing' : value.charAt(0).toUpperCase() + value.slice(1)}</button>)}
+          </div>
+          <div role="tabpanel" id="editor-panel-profile" aria-labelledby="editor-tab-profile" hidden={tab !== 'profile'}>
+            <section className="creator-editor-panel">
+              <h2>Profile details</h2><p>Make a great first impression. Your preview updates as you type.</p>
+              {ownsProfile && session.user ? <ProfilePhotoEditor user={session.user} readable={accountReadable} writable={accountWritable} onBusyChange={setPhotoBusy} onPreviewChange={setPhoto} /> : <p>{owner ? `Profile photo and socials belong to @${owner.username}. Only the owner can edit them.` : 'Loading profile details…'}</p>}
+              <form onSubmit={event => void savePage(event)} className="creator-editor-fields">
+                <div className="creator-editor-identity-fields">
+                  <Field label="Page display name" maxLength={120} value={pageValues.title} onChange={event => updatePageValue('title', event.currentTarget.value)} hint="Leave blank to use your account display name." />
+                  <div id="page-address">
               <Field
-                label="Public address"
+                label="Page username"
                 maxLength={48}
                 value={slugValue}
                 onChange={(event) => setSlugValue(event.currentTarget.value)}
                 hint={slugMessage ?? 'Changing the address reserves the old one permanently.'}
                 error={slugStatus === 'unavailable' ? 'Choose a different address.' : undefined}
               />
-            </div>
+                  </div>
+                </div>
             {slugStatus === 'checking' ? <p role="status" className="font-mono text-[0.625rem] text-ink-faint">Checking address…</p> : null}
             {slugStatus === 'available' ? <p role="status" className="font-mono text-[0.625rem] text-ink-soft">{slugMessage}</p> : null}
             {slugStatus === 'error' ? <p role="alert" className="font-mono text-[0.625rem] text-danger">{slugMessage}</p> : null}
-            <Field label="Title" maxLength={120} value={pageValues.title} onChange={(event) => updatePageValue('title', event.currentTarget.value)} />
-            <TextareaField label="Introduction" maxLength={500} rows={3} value={pageValues.bio} onChange={(event) => updatePageValue('bio', event.currentTarget.value)} hint={`${pageValues.bio.length}/500`} />
+                <TextareaField label="Short bio" maxLength={500} rows={3} value={pageValues.bio} onChange={event => updatePageValue('bio', event.currentTarget.value)} hint={`Page introduction · ${pageValues.bio.length}/500. Appears above your account bio.`} />
+                {slugValue.trim().toLowerCase() !== detail.page.slug.toLowerCase() ? <Button type="submit" pending={pagePending} disabled={slugStatus !== 'available'}>Change address</Button> : null}
+              </form>
+            </section>
+            {ownsProfile ? <section className="creator-editor-panel">
+              <SocialsEditor readable={accountReadable} writable={accountWritable} blockedReason="Your account must be active to edit social profiles." onPreviewChange={setSocialPreview} onStateChange={setSocialState} />
+              <p className="creator-editor-account-note">Photo and social changes save to your account immediately and appear across all your pages.</p>
+            </section> : null}
+          </div>
+          <section role="tabpanel" id="editor-panel-design" aria-labelledby="editor-tab-design" hidden={tab !== 'design'} className="creator-editor-panel space-y-5">
+            <div><h2 id="appearance-heading">Page design</h2><p className="creator-muted">Give your page a look that feels like you.</p></div>
             <div className="grid gap-6 sm:grid-cols-2">
               <SelectField
                 label="Theme"
@@ -1044,16 +1090,14 @@ export function PageEditorRoute() {
               />
             </div>
             <Field label="Accent colour" maxLength={7} value={pageValues.accentColor} onChange={(event) => updatePageValue('accentColor', event.currentTarget.value)} hint="Optional #rrggbb colour." />
+            <div className="creator-editor-swatch-row" role="group" aria-label="Accent presets">{['#00d8ef', '#3b82f6', '#a855f7', '#ec4899', '#f59e0b', '#22c55e'].map(color => <button key={color} type="button" style={{ background: color }} aria-label={`Use ${color} accent`} aria-pressed={pageValues.accentColor.toLowerCase() === color} onClick={() => updatePageValue('accentColor', color)} />)}</div>
             <label className="flex items-center gap-3 border-y border-rule py-4 text-sm">
               <input type="checkbox" checked={pageValues.showBranding} onChange={(event) => updatePageValue('showBranding', event.currentTarget.checked)} className="accent-black" />
               Show OneLink credit
             </label>
-            {slugValue.trim().toLowerCase() !== detail.page.slug.toLowerCase() ? (
-              <Button type="submit" pending={pagePending} disabled={slugStatus !== 'available'}>Change address</Button>
-            ) : null}
-          </form>
+          </section>
 
-          <section aria-labelledby="links-heading" className="border border-rule bg-white/80 p-5 sm:p-6">
+          <section role="tabpanel" id="editor-panel-links" aria-labelledby="editor-tab-links" hidden={tab !== 'links'} className="creator-editor-panel">
             <div className="flex flex-wrap items-end justify-between gap-4 border-b border-rule pb-3">
               <div><p className="eyebrow">02 · Destinations</p><h2 id="links-heading" className="mt-1 font-display text-2xl">Your links</h2></div>
               <Button variant="outline" onClick={startNewLink}>Add a link</Button>
@@ -1227,7 +1271,7 @@ export function PageEditorRoute() {
             </dialog>
           </section>
 
-          <section aria-labelledby="publish-heading" className="border border-ink bg-white/80 p-5 sm:p-6">
+          <section role="tabpanel" id="editor-panel-publish" aria-labelledby="editor-tab-publish" hidden={tab !== 'publish'} className="creator-editor-panel">
             <p className="eyebrow">03 · Release</p>
             <h2 id="publish-heading" className="mt-1 font-display text-2xl">Publication</h2>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-soft">
@@ -1252,8 +1296,12 @@ export function PageEditorRoute() {
                 <Button type="button" variant="outline" disabled={draftDirty || draftStatus !== 'saved' || draftActionPending} onClick={() => setDiscardDraftOpen(true)}>Discard draft</Button>
               ) : null}
               <Button type="button" variant="outline" onClick={() => void openRevisionHistory()}>Version history</Button>
+              {detail.page.status === 'published' ? <Button type="button" variant="outline" onClick={() => void sharePublicPage()}>Share page</Button> : null}
+              <Link className="creator-button" to={`/app/share?page=${id}`}>Share &amp; QR</Link>
+              <Button type="button" variant="outline" onClick={() => setDeletingPage(true)}>Delete page</Button>
               {detail.page.publishedAt ? <span className="font-mono text-[0.625rem] uppercase tracking-widest text-ink-faint">Published {new Date(detail.page.publishedAt).toLocaleString()}</span> : null}
             </div>
+            {qrOpen && detail.page.status === 'published' ? <div className="mt-4"><Button type="button" variant="outline" onClick={() => setQrOpen(false)}>Close QR tools</Button><QrCodeTools url={publicUrl} name={detail.page.slug} /></div> : null}
             {revisionsOpen ? (
               <div className="mt-4 border border-rule p-4" aria-live="polite">
                 <div className="flex items-center justify-between gap-3">
@@ -1284,29 +1332,11 @@ export function PageEditorRoute() {
           </section>
         </div>
 
-        <aside className="min-w-0 xl:sticky xl:top-8 xl:self-start" aria-label="Page preview">
-          <div className="mb-3 flex items-end justify-between gap-2">
-            <div><p className="eyebrow">Saved composition</p><h2 className="mt-1 font-display text-xl">Preview</h2></div>
-            <div className="flex items-center gap-3">
-              <Button type="button" variant="outline" disabled={draftDirty || draftStatus !== 'saved'} onClick={() => void loadServerPreview()}>Refresh saved preview</Button>
-            </div>
-          </div>
-          <div className="overflow-hidden border border-ink shadow-[6px_6px_0_rgba(0,0,0,.08)]">
-            {serverPreview ? <PageRenderer page={serverPreview} /> : previewError ? (
-              <div className="p-5">
-                <ErrorNotice error={previewError} action="Retry saved preview" onRetry={() => void loadServerPreview()} />
-              </div>
-            ) : <p role="status" className="p-5 text-sm text-ink-soft">{previewPending ? 'Refreshing the saved preview…' : 'Preparing the saved preview…'}</p>}
-          </div>
-          {detail.page.status === 'published' ? (
-            <div className="mt-4">
-              <Button type="button" variant="outline" aria-expanded={qrOpen} onClick={() => setQrOpen((open) => !open)}>
-                {qrOpen ? 'Close QR tools' : 'Make a QR code'}
-              </Button>
-              {qrOpen ? <QrCodeTools url={publicUrl} name={detail.page.slug} /> : null}
-            </div>
-          ) : null}
-        </aside>
+        <div className="creator-editor-preview">
+          {livePreview ? <CreatorPreview page={livePreview} photo={ownsProfile ? photo : null} draftNotice="Previewing your draft. Publish to update your page. Photo and social changes are saved to your account immediately." />
+            : previewError ? <ErrorNotice error={previewError} action="Retry preview" onRetry={() => void loadServerPreview()} />
+              : <p role="status">{previewPending ? 'Refreshing your preview…' : 'Preparing your preview…'}</p>}
+        </div>
       </div>
 
       <ConfirmDialog
@@ -1362,6 +1392,8 @@ export function PageEditorRoute() {
         onCancel={navigation.stay}
       >
         {linkDirty ? <p>A link form that has not been added will be lost.</p> : null}
+        {accountUnsaved ? <p>Finish or discard your photo and social edits before leaving to keep those changes.</p> : null}
+        {slugValue.trim().toLowerCase() !== detail.page.slug.toLowerCase() ? <p>Your page address change has not been confirmed.</p> : null}
         {draftStatus === 'error'
           ? <p>The latest page edits could not be saved and will be lost if you leave.</p>
           : draftDirty

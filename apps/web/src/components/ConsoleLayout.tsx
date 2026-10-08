@@ -1,5 +1,4 @@
-import { Outlet } from 'react-router-dom'
-import { ConsoleNav } from './ConsoleNav'
+import { Outlet, useMatch } from 'react-router-dom'
 
 // ============================================================================
 // Inside the console: a rail and the screen.
@@ -16,12 +15,16 @@ import { ConsoleNav } from './ConsoleNav'
 // ============================================================================
 
 export function ConsoleLayout() {
+  const overview = useMatch('/app/dashboard')
+  const setup = useMatch('/app/onboarding')
+  const links = useMatch('/app/links')
+  const analytics = useMatch('/app/analytics')
+  const share = useMatch('/app/share')
+  const editor = useMatch('/app/pages/:id')
+  const editorEntry = useMatch('/app/editor')
   return (
-    <div className="min-w-0">
-      <ConsoleNav />
-      <div className="min-w-0 pt-7 sm:pt-9">
-        <Outlet />
-      </div>
+    <div className={overview || setup || links || analytics || share || editorEntry || (editor && editor.params.id !== 'new') ? 'min-w-0' : 'creator-legacy min-w-0'}>
+      <Outlet />
     </div>
   )
 }

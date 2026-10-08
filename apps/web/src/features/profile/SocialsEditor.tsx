@@ -48,9 +48,10 @@ export interface SocialsEditorProps {
   /** Why the section is empty when `readable` is false. Never rendered otherwise. */
   blockedReason: ReactNode
   onPreviewChange?: (socials: PreviewSocials) => void
+  onStateChange?: (state: { pending: boolean; dirty: boolean }) => void
 }
 
-export function SocialsEditor({ readable, writable, blockedReason, onPreviewChange }: SocialsEditorProps) {
+export function SocialsEditor({ readable, writable, blockedReason, onPreviewChange, onStateChange }: SocialsEditorProps) {
   const socials = useResource(socialsApi.list, { enabled: readable })
 
   const [pending, setPending] = useState(false)
@@ -89,6 +90,9 @@ export function SocialsEditor({ readable, writable, blockedReason, onPreviewChan
     onPreviewChange?.({ links: previewLinks, loading: readable && socials.loading, unavailable: !readable || socials.error !== null })
   }, [previewLinks, readable, socials.loading, socials.error, onPreviewChange])
   const atCap = list.length >= MAX_SOCIALS_PER_PROFILE
+  useEffect(() => {
+    onStateChange?.({ pending, dirty: url.trim().length > 0 || Object.keys(drafts).length > 0 })
+  }, [pending, url, drafts, onStateChange])
 
   const reset = () => {
     setUrl('')

@@ -2,6 +2,7 @@ import { Link, Outlet, useMatch } from 'react-router-dom'
 import { useSession } from '../lib/session'
 import { SuspendedNotice } from './SuspendedNotice'
 import { AuthHeader } from './AuthPage'
+import { CreatorShell } from '../features/creator/CreatorShell'
 
 // ============================================================================
 // Page chrome for every route: masthead, any blocking advisory, and the footer.
@@ -19,13 +20,16 @@ export function AppShell() {
   const { status, user, platformName, settings, logout } = useSession()
   const loginMatch = useMatch('/login')
   const registerMatch = useMatch('/register')
+  const creatorPage = useMatch('/app/*')
   const authPage = Boolean(loginMatch || registerMatch)
   const maintenanceSetting = settings?.settings['platform.maintenance_mode']
   const maintenanceEnabled = maintenanceSetting === true || maintenanceSetting === 'true'
   const maintenanceMessage = settings?.settings['platform.maintenance_message']
 
+  if (creatorPage) return <CreatorShell />
+
   return (
-    <div className={`flex min-h-screen flex-col${authPage ? ' auth-shell' : ' console-page'}`}>
+    <div className={`flex min-h-screen flex-col${authPage ? ` auth-shell auth-shell-${registerMatch ? 'register' : 'login'}` : ' console-page'}`}>
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-ink focus:px-3 focus:py-2 focus:font-mono focus:text-xs focus:uppercase focus:text-paper"
@@ -88,7 +92,10 @@ export function AppShell() {
         <Outlet />
       </main>
 
-      {authPage ? <footer className="auth-footer">{platformName} · A home for your links.</footer> : <footer className="border-t border-rule bg-paper-deep/80">
+      {authPage ? <footer className="auth-footer">
+        <p>© {new Date().getFullYear()} {platformName}<span>All your links. One place.</span></p>
+        <p><span className="auth-footer-status">{settings ? 'Status: Connected' : 'Status: Unavailable'}</span><span aria-hidden="true">·</span>Secure sessions</p>
+      </footer> : <footer className="border-t border-rule bg-paper-deep/80">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-5 sm:px-6">
           <p className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-ink-faint">
             {platformName} · console

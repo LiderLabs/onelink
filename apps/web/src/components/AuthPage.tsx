@@ -1,43 +1,49 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { Link, useLocation, useMatch } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useSession } from '../lib/session'
-import { safeNext } from './Guards'
 
-/** A shared composition for the two entry points; recovery keeps AuthFrame. */
-export function AuthPage({ title, description, children }: {
+export function AuthIcon({ name }: { name: 'user' | 'email' | 'key' | 'shield' | 'eye' | 'eye-off' | 'arrow' | 'brand' }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      {name === 'user' ? <><circle cx="12" cy="8" r="3" /><path d="M5.5 20v-2a6.5 6.5 0 0 1 13 0v2z" /></> : null}
+      {name === 'email' ? <><circle cx="12" cy="12" r="3.5" /><path d="M15.5 8.5v6a2 2 0 0 0 4 0V12a7.5 7.5 0 1 0-3.8 6.5" /></> : null}
+      {name === 'key' ? <><circle cx="16" cy="8" r="4.5" /><path d="m12.5 11.5-8 8H2v-3l3-3h3l3-3M16.5 7.5h.01" /></> : null}
+      {name === 'shield' ? <><path d="M12 3 4 6.5v5c0 4.5 8 9.5 8 9.5s8-5 8-9.5v-5z" /><path d="m8 12 2.5 2.5 5.5-5.5" /></> : null}
+      {name === 'eye' || name === 'eye-off' ? <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />{name === 'eye-off' ? <path d="m3 3 18 18" /> : null}</> : null}
+      {name === 'arrow' ? <path d="M4 12h16m-6-6 6 6-6 6" /> : null}
+      {name === 'brand' ? <><rect x="4" y="3" width="16" height="18" rx="5" /><circle cx="12" cy="12" r="2.5" /><path d="M12 9.5v2" /></> : null}
+    </svg>
+  )
+}
+
+/** Signup and sign-in share the reference's centered card; recovery keeps AuthFrame. */
+export function AuthPage({ title, description, children, variant = 'login' }: {
   title: string
   description: string
   children: ReactNode
+  variant?: 'login' | 'register'
 }) {
   const { platformName } = useSession()
   useEffect(() => {
     const previous = document.title
+    const theme = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    const previousTheme = theme?.content
     document.title = `${title} · ${platformName}`
-    return () => { document.title = previous }
+    if (theme) theme.content = '#0c0e12'
+    return () => {
+      document.title = previous
+      if (theme && previousTheme) theme.content = previousTheme
+    }
   }, [title, platformName])
   return (
-    <div className="auth-layout">
-      <aside className="auth-story reveal" aria-label={`About ${platformName}`}>
-        <p className="auth-kicker">A little space. All yours.</p>
-        <h2>All your links.<br />A place of<br /><em>their own.</em></h2>
-        <p className="auth-story-copy">Bring your work, your ideas, and your favorite corners of the internet together.</p>
-        <div className="auth-preview" aria-hidden="true">
-          <div className="auth-preview-top"><span className="auth-preview-dot" /><span>A page with personality</span><span>↗</span></div>
-          <div className="auth-preview-profile">
-            <span className="auth-avatar">ar<span>✳</span></span>
-            <strong>Alex Rivera</strong>
-            <p>Designer, maker, curious human.</p>
-          </div>
-          <div className="auth-preview-link"><span><small>01</small> Selected work</span><span>↗</span></div>
-          <div className="auth-preview-link"><span><small>02</small> Studio notes</span><span>↗</span></div>
-          <div className="auth-preview-link"><span><small>03</small> Get in touch</span><span>↗</span></div>
-          <p className="auth-preview-foot">Made for whatever you make.</p>
-        </div>
-        <p className="auth-story-foot"><span aria-hidden="true">↗</span> One page. Plenty of possibilities.</p>
-      </aside>
-      <section className="auth-form-panel reveal" aria-labelledby="auth-title">
+    <div className={`auth-layout auth-layout-${variant}`}>
+      <section className="auth-form-panel" aria-labelledby="auth-title">
         <div className="auth-form-heading">
+          <Link to="/" className="auth-brand" aria-label={`${platformName} home`}>
+            <span className="auth-brand-mark"><AuthIcon name="brand" /></span>
+            <span className="auth-wordmark">{platformName === 'OneLink' ? <>One<span>Link</span></> : platformName}</span>
+          </Link>
           <h1 id="auth-title">{title}</h1>
           <p>{description}</p>
         </div>
@@ -48,18 +54,12 @@ export function AuthPage({ title, description, children }: {
 }
 
 export function AuthHeader() {
-  const { platformName, settings } = useSession()
-  const location = useLocation()
-  const registering = Boolean(useMatch('/register'))
-  const registrationOpen = settings?.settings['platform.registration_open']
-  const next = safeNext(new URLSearchParams(location.search).get('next'))
-  const destination = registering ? '/login' : '/register'
   return (
-    <header className="auth-header">
-      <Link to="/" className="auth-brand"><span aria-hidden="true" className="auth-brand-mark">↗</span>{platformName}</Link>
-      {registering || registrationOpen === true || registrationOpen === 'true' ? (
-        <nav aria-label="Account"><span>{registering ? 'Already have an account?' : 'New here?'}</span><Link className="auth-link" to={`${destination}${next ? `?next=${encodeURIComponent(next)}` : ''}`}>{registering ? 'Sign in' : 'Create an account'}<span aria-hidden="true"> ↗</span></Link></nav>
-      ) : null}
-    </header>
+    <div className="auth-ambient" aria-hidden="true">
+      <svg className="auth-ambient-grain" width="100%" height="100%">
+        <filter id="auth-grain"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="3" stitchTiles="stitch" /></filter>
+        <rect width="100%" height="100%" filter="url(#auth-grain)" />
+      </svg>
+    </div>
   )
 }

@@ -1,0 +1,51 @@
+.creator-page-editor { min-width: 0; }
+.creator-editor-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+.creator-editor-heading h1 { margin: .5rem 0; font-size: clamp(1.75rem, 3vw, 2.25rem); line-height: 1.2; font-weight: 600; letter-spacing: -.035em; }
+.creator-editor-heading p:not(.creator-eyebrow) { color: var(--creator-muted); }
+.creator-editor-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, 23rem); align-items: start; gap: 1.5rem; margin-top: 1.5rem; }
+.creator-editor-content { min-width: 0; }
+.creator-editor-tabs { display: flex; gap: .375rem; padding: .375rem; margin-bottom: 1.25rem; border: 1px solid var(--creator-border); background: #141720; border-radius: .875rem; }
+.creator-editor-tabs button { flex: 1; min-width: 0; min-height: 2.5rem; color: var(--creator-muted); border: 1px solid transparent; }
+.creator-editor-tabs button[aria-selected=true] { color: var(--creator-accent); border-color: #00d8ef66; background: #00d8ef14; }
+.creator-page-editor [hidden] { display: none !important; }
+.creator-editor-panel { padding: 1.5rem; border: 1px solid var(--creator-border); border-radius: 1rem; background: var(--creator-surface); }
+.creator-editor-panel + .creator-editor-panel { margin-top: 1.25rem; }
+.creator-editor-panel h2, .creator-editor-panel h3 { font-family: 'Outfit', var(--font-sans); font-weight: 500; letter-spacing: -.02em; }
+.creator-editor-panel h2 { font-size: 1.25rem; }
+.creator-editor-panel > p { margin-top: .375rem; color: var(--creator-muted); font-size: .8125rem; line-height: 1.6; }
+.creator-editor-fields { display: grid; gap: 1.25rem; margin-top: 1.5rem; }
+.creator-editor-identity-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.creator-editor-panel .profile-photo-editor { padding-top: 1rem; }
+.creator-editor-panel .profile-section { border-top: 0; padding-block: .75rem; }
+.creator-editor-panel .profile-section-index, .creator-editor-panel .profile-section-note { display: none; }
+.creator-editor-panel .profile-photo-avatar { width: 5rem; height: 5rem; border-radius: 50%; }
+.creator-editor-panel .profile-section-heading { margin-bottom: .875rem; }
+.creator-editor-panel .profile-photo-details { min-width: 0; }
+.creator-editor-account-note { margin: 1rem 0 0; padding: .875rem 1rem; background: #00d8ef08; border: 1px solid #00d8ef25; border-radius: .75rem; font-size: .75rem; color: var(--creator-muted); line-height: 1.6; }
+.creator-editor-preview { position: sticky; top: 6.25rem; min-width: 0; padding: 1.25rem; border: 1px solid var(--creator-border); border-radius: 1rem; background: var(--creator-surface); }
+.creator-editor-preview .creator-preview { position: static; }
+.creator-editor-preview .creator-phone { max-width: 20rem; margin-inline: auto; }
+.creator-page-actions { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
+.creator-editor-save-state { color: #40d5ae; font-size: .75rem; white-space: nowrap; margin-right: .375rem; }
+.creator-editor-save-state[data-unsaved=true] { color: #e1bd67; }
+.creator-editor-swatch-row { display: flex; flex-wrap: wrap; gap: .75rem; }
+.creator-editor-swatch-row button { width: 2rem; height: 2rem; border-radius: 50%; outline-offset: 3px; border: 2px solid transparent; }
+.creator-editor-swatch-row button[aria-pressed=true] { outline: 2px solid var(--creator-accent); }
+.creator-page-editor .creator-editor-panel input[type=checkbox] { accent-color: var(--creator-accent); }
+.creator-page-editor .creator-editor-panel [class*=border-rule] { border-color: var(--creator-border); }
+.creator-page-editor .creator-editor-panel .eyebrow { letter-spacing: .05em; font-size: .6875rem; }
+.creator-page-editor .creator-editor-panel > .profile-section h2 { font-size: 1.25rem; }
+.creator-topbar-editor .creator-topbar-account { gap: .625rem; }
+@media (max-width: 1250px) { .creator-topbar-editor .creator-account-link > span, .creator-topbar-editor .creator-editor-save-state { display: none; } .creator-editor-grid { grid-template-columns: minmax(0, 1fr) minmax(16rem, 19rem); } }
+@media (max-width: 1050px) { .creator-editor-grid { grid-template-columns: minmax(0, 1fr); } .creator-editor-preview { position: static; max-width: 34rem; width: 100%; margin-inline: auto; } }
+@media (max-width: 600px) {
+  .creator-topbar-editor { flex-wrap: wrap; }
+  .creator-topbar-editor .creator-page-actions { order: 4; width: 100%; margin: 0; }
+  .creator-topbar-editor .creator-page-actions .creator-button { flex: 1; min-height: 2.375rem; padding: .5rem .75rem; }
+  .creator-editor-heading { align-items: flex-start; flex-direction: column; }
+  .creator-editor-panel { padding: 1.125rem; }
+  .creator-editor-identity-fields { grid-template-columns: 1fr; }
+  .creator-editor-tabs { gap: .125rem; }
+  .creator-editor-tabs button { font-size: .8125rem; }
+  .creator-page-editor .profile-photo-summary { flex-wrap: wrap; }
+}

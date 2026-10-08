@@ -214,6 +214,8 @@ export type ModerationStatus = 'visible' | 'under_review' | 'removed'
 
 export interface OwnerPage {
   id: string
+  /** Present on the API's page listing; creation responses are owner-only. */
+  accessRole?: 'owner' | 'editor' | 'viewer'
   slug: string
   title: string | null
   bio: string | null

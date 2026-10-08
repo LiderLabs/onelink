@@ -20,7 +20,7 @@ export function ProfileScreen() {
   const [previewSocials, setPreviewSocials] = useState<PreviewSocials>({ links: [], loading: true, unavailable: false })
 
   useEffect(() => {
-    document.title = `Dashboard · ${session.platformName}`
+    document.title = `Profile · ${session.platformName}`
   }, [session.platformName])
 
   if (!user) return <Splash label="Loading your account" />

@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { errorMessageFor, fieldErrorsFrom } from '../lib/api'
 import { useSession } from '../lib/session'
-import { AuthPage } from '../components/AuthPage'
+import { AuthIcon, AuthPage } from '../components/AuthPage'
 import { AuthField } from '../components/AuthField'
 import { safeNext } from '../components/Guards'
 
@@ -46,7 +46,7 @@ export function LoginRoute() {
     setPending(true)
     try {
       await session.login(identifier.trim(), password)
-      navigate(next ?? '/app', { replace: true })
+      navigate('/app', { replace: true })
     } catch (caught) {
       setError(errorMessageFor(caught))
       setFieldErrors(fieldErrorsFrom(caught))
@@ -57,24 +57,26 @@ export function LoginRoute() {
   }
 
   return (
-    <AuthPage title="Welcome back" description="Sign in to make a little more room for what you do.">
+    <AuthPage title="Welcome back" description="Sign in to manage your links and creator profile.">
       <form ref={formRef} onSubmit={(event) => void onSubmit(event)} noValidate className="auth-form" aria-busy={pending}>
         {error ? <div ref={errorRef} tabIndex={-1} role="alert" className="auth-notice"><strong>Could not sign in</strong>{error}</div> : null}
         <fieldset disabled={pending} className="auth-form-fields">
           <legend className="sr-only">Sign in to your account</legend>
-          <AuthField label="Username or email" name="identifier" autoComplete="username" required
-            placeholder="you@example.com" error={fieldErrors.identifier} value={identifier}
+          <AuthField label="Email or username" name="identifier" autoComplete="username" required icon="email" maxLength={320}
+            placeholder="alex@onelink.me or alexvance" error={fieldErrors.identifier} value={identifier}
             onChange={(event) => setIdentifier(event.target.value)} />
-          <AuthField label="Password" name="password" type="password" autoComplete="current-password" required
+          <AuthField label="Password" name="password" type="password" autoComplete="current-password" required icon="key" maxLength={200}
             labelAction={<Link to="/forgot-password" className="auth-link">Forgot password?</Link>}
-            placeholder="Your password" error={fieldErrors.password} value={password}
+            placeholder="Enter your password" error={fieldErrors.password} value={password}
             onChange={(event) => setPassword(event.target.value)} />
+          <p className="auth-session-detail"><AuthIcon name="shield" />Secure sign-in<span>8-hour session</span></p>
           <button type="submit" className="auth-submit" disabled={pending}>
-            {pending ? 'Signing in…' : 'Sign in'}{!pending ? <span aria-hidden="true">↗</span> : null}
+            {pending ? 'Signing in…' : `Sign In to ${session.platformName}`}{!pending ? <AuthIcon name="arrow" /> : null}
           </button>
         </fieldset>
       </form>
-      {registrationOpen ? <p className="auth-form-footer">A new place to start?<Link className="auth-link" to={`/register${next ? `?next=${encodeURIComponent(next)}` : ''}`}>Create an account</Link></p> : null}
+      {registrationOpen ? <p className="auth-form-footer">Don't have an account?<Link className="auth-link" to={`/register${next ? `?next=${encodeURIComponent(next)}` : ''}`}>Create account</Link></p> : null}
+      <p className="auth-session-note"><AuthIcon name="shield" />Your account uses a secure, private session.</p>
     </AuthPage>
   )
 }

@@ -12,8 +12,14 @@ import { ResetPasswordRoute } from './routes/reset-password'
 import { PageCreateRoute } from './features/pages/PageCreateRoute'
 import { PageEditorRoute } from './features/pages/PageEditorRoute'
 import { PageListRoute } from './features/pages/PageListRoute'
-import { DashboardRoute } from './features/console/DashboardRoute'
-import { AnalyticsRoute, SettingsRoute, SubmissionsRoute } from './features/console/R2Routes'
+import { CreatorDashboardRoute } from './features/creator/CreatorDashboardRoute'
+import { CreatorLinksRoute } from './features/creator/CreatorLinksRoute'
+import { CreatorAnalyticsRoute } from './features/creator/CreatorAnalyticsRoute'
+import { CreatorShareRoute } from './features/creator/CreatorShareRoute'
+import { CreatorEntryRoute, CreatorEditorEntryRoute } from './features/creator/CreatorEntryRoute'
+import { OnboardingRoute } from './features/creator/OnboardingRoute'
+import { ProfileScreen } from './features/profile/ProfileScreen'
+import { SettingsRoute, SubmissionsRoute } from './features/console/R2Routes'
 import { Navigate } from 'react-router-dom'
 import type { RouteObject } from 'react-router-dom'
 
@@ -65,11 +71,15 @@ export const routes: RouteObject[] = [
           {
             element: <ConsoleLayout />,
             children: [
-              { index: true, element: <DashboardRoute /> },
-              // Older account URLs remain aliases; editing now lives on Dashboard.
-              { path: 'profile', element: <Navigate to="/app#profile-editor" replace /> },
-              { path: 'socials', element: <Navigate to="/app#socials" replace /> },
-              { path: 'analytics', element: <AnalyticsRoute /> },
+              { index: true, element: <CreatorEntryRoute /> },
+              { path: 'dashboard', element: <CreatorDashboardRoute /> },
+              { path: 'editor', element: <CreatorEditorEntryRoute /> },
+              { path: 'onboarding', element: <OnboardingRoute /> },
+              { path: 'profile', element: <ProfileScreen /> },
+              { path: 'socials', element: <Navigate to="/app/profile#socials" replace /> },
+              { path: 'links', element: <CreatorLinksRoute /> },
+              { path: 'share', element: <CreatorShareRoute /> },
+              { path: 'analytics', element: <CreatorAnalyticsRoute /> },
               { path: 'settings', element: <SettingsRoute /> },
               { path: 'submissions', element: <SubmissionsRoute /> },
               { path: 'pages', element: <PageListRoute /> },
@@ -84,7 +94,7 @@ export const routes: RouteObject[] = [
       // Kept for bookmarks: `/profile` was the account screen before the console
       // namespace existed. A `profile` slug is still served at `/p/profile`, so
       // this alias costs one public address, not every one of them.
-      { path: '/profile', element: <Navigate to="/app#profile-editor" replace /> },
+      { path: '/profile', element: <Navigate to="/app/profile" replace /> },
       { path: '/', element: <Navigate to="/app" replace /> },
       { path: '*', element: <NotFoundRoute /> },
     ],

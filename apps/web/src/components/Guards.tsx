@@ -37,15 +37,16 @@ export function RequireAuth() {
     const next = encodeURIComponent(`${location.pathname}${location.search}`)
     return <Navigate to={`/login?next=${next}`} replace />
   }
-  if (session.mustChangePassword && location.pathname !== '/app') {
+  const accountDestination = ['/app', '/app/dashboard', '/app/profile'].includes(location.pathname)
+  if (session.mustChangePassword && !accountDestination) {
     return <Navigate to="/app" replace />
   }
-  if (session.user.status !== 'active' && location.pathname !== '/app') {
+  if (session.user.status !== 'active' && !accountDestination) {
     return <Navigate to="/app" replace />
   }
   if (
     session.user.impersonatedBy !== null &&
-    location.pathname !== '/app'
+    !accountDestination
   ) {
     return <Navigate to="/app" replace />
   }
@@ -56,13 +57,11 @@ export function RequireAuth() {
 /** The sign-in / sign-up screens: pointless for someone already signed in. */
 export function RequireAnonymous() {
   const session = useSession()
-  const location = useLocation()
 
   if (session.status === 'loading') return <Splash />
   if (session.status === 'unavailable') return <UnavailableScreen />
   if (session.user) {
-    const next = safeNext(new URLSearchParams(location.search).get('next'))
-    return <Navigate to={next ?? '/app'} replace />
+    return <Navigate to="/app" replace />
   }
 
   return <Outlet />

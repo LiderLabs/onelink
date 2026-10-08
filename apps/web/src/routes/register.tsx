@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { errorMessageFor, fieldErrorsFrom } from '../lib/api'
 import { useSession } from '../lib/session'
-import { AuthPage } from '../components/AuthPage'
+import { AuthIcon, AuthPage } from '../components/AuthPage'
 import { AuthField } from '../components/AuthField'
 import { safeNext } from '../components/Guards'
 
@@ -35,6 +35,9 @@ export function RegisterRoute() {
   const registrationOpen = registrationSetting === true || registrationSetting === 'true'
   const next = safeNext(new URLSearchParams(location.search).get('next'))
   const loginUrl = `/login${next ? `?next=${encodeURIComponent(next)}` : ''}`
+  const strength = !password ? 0 : password.length < 8 ? 1 : Math.min(4,
+    1 + Number(password.length >= 12) + Number(/[a-z]/.test(password) && /[A-Z]/.test(password)) + Number(/[0-9\W_]/.test(password)))
+  const strengthLabel = ['8+ characters', 'Weak', 'Fair', 'Good', 'Strong'][strength]
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -64,7 +67,7 @@ export function RegisterRoute() {
         password,
         ...(displayName.trim() ? { displayName: displayName.trim() } : {}),
       })
-      navigate(next ?? '/app', { replace: true })
+      navigate('/app/onboarding', { replace: true })
     } catch (caught) {
       setError(errorMessageFor(caught))
       setFieldErrors(fieldErrorsFrom(caught))
@@ -74,7 +77,7 @@ export function RegisterRoute() {
   }
 
   return (
-    <AuthPage title="Make a home for your links" description="Start with an account. Make it yours from there.">
+    <AuthPage variant="register" title="Create your free account" description="Claim your custom link and build your creator portal">
       {!registrationOpen ? <div className="auth-closed" role="status">
         <h2>{session.settings ? 'Sign-ups are closed' : 'Sign-up is temporarily unavailable'}</h2>
         <p>{session.settings ? 'New accounts are paused for now. If you already have an account, you can still sign in.' : 'We could not check whether new accounts are available. Please try again.'}</p>
@@ -83,25 +86,28 @@ export function RegisterRoute() {
         {error ? <div ref={errorRef} tabIndex={-1} role="alert" className="auth-notice"><strong>Could not create your account</strong>{error}</div> : null}
         <fieldset disabled={pending} className="auth-form-fields">
           <legend className="sr-only">Create your account</legend>
-          <div className="auth-field-row">
-            <AuthField label="Username" name="username" autoComplete="username" required placeholder="yourname"
-              hint="3–32 letters, numbers, dots, underscores, or dashes." error={fieldErrors.username}
-              value={username} onChange={(event) => setUsername(event.target.value)} />
-            <AuthField label="Display name" name="displayName" autoComplete="nickname" optional placeholder="Your name"
-              error={fieldErrors.displayName} value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
-          </div>
-          <AuthField label="Email" name="email" type="email" autoComplete="email" required placeholder="you@example.com"
+          <AuthField label="Display name" name="displayName" autoComplete="nickname" optional placeholder="Alex Vance" icon="user" maxLength={80}
+            error={fieldErrors.displayName} value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+          <AuthField label="Username" name="username" autoComplete="username" required placeholder="alexvance" prefix="onelink.me/" maxLength={32}
+            title="3–32 letters, numbers, dots, underscores, or dashes."
+            error={fieldErrors.username} value={username} onChange={(event) => setUsername(event.target.value)} />
+          <AuthField label="Email address" name="email" type="email" autoComplete="email" required placeholder="alex@onelink.me" icon="email" maxLength={320}
             error={fieldErrors.email} value={email} onChange={(event) => setEmail(event.target.value)} />
-          <AuthField label="Password" name="password" type="password" autoComplete="new-password" required placeholder="Create a password"
-            hint="At least 8 characters." error={fieldErrors.password} value={password} onChange={(event) => setPassword(event.target.value)} />
-          <AuthField label="Confirm password" name="confirmPassword" type="password" autoComplete="new-password" required placeholder="Repeat your password"
+          <AuthField label="Password" name="password" type="password" autoComplete="new-password" required placeholder="Create a password" icon="key" maxLength={200}
+            error={fieldErrors.password} value={password} onChange={(event) => setPassword(event.target.value)} />
+          <AuthField label="Confirm password" name="confirmPassword" type="password" autoComplete="new-password" required placeholder="Repeat your password" icon="shield" maxLength={200}
             error={fieldErrors.confirmPassword} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+          <div className="auth-strength" data-strength={strength} aria-label={`Password strength: ${strengthLabel}`}>
+            <div className="auth-strength-bars" aria-hidden="true">{[1, 2, 3, 4].map((bar) => <span key={bar} className={bar <= strength ? 'is-filled' : undefined} />)}</div>
+            <span>{strengthLabel}</span>
+          </div>
           <button type="submit" className="auth-submit" disabled={pending}>
-            {pending ? 'Creating account…' : 'Create account'}{!pending ? <span aria-hidden="true">↗</span> : null}
+            {pending ? 'Creating account…' : 'Create Account'}{!pending ? <AuthIcon name="arrow" /> : null}
           </button>
         </fieldset>
       </form>}
-      <p className="auth-form-footer">Already have an account?<Link className="auth-link" to={loginUrl}>Sign in</Link></p>
+      <p className="auth-form-footer">Already have an account?<Link className="auth-link" to={loginUrl}>Log in</Link></p>
+      <p className="auth-session-note"><AuthIcon name="shield" />Your account uses a secure, private session.</p>
     </AuthPage>
   )
 }

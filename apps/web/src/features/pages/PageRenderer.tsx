@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { PageLink, PageLayout, PageTheme, PublicPageOwner } from '../../lib/types'
 
 export interface PageRenderModel {
@@ -17,34 +17,36 @@ export interface PageRenderModel {
 function safeHttpUrl(value: string): string | null {
   try {
     const url = new URL(value)
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null
+    return (url.protocol === 'http:' || url.protocol === 'https:') && !url.username && !url.password ? url.href : null
   } catch {
     return null
   }
 }
 
-export function PageRenderer({ page }: { page: PageRenderModel }) {
+export function PageRenderer({ page, avatarOverride, emptyState }: { page: PageRenderModel; avatarOverride?: ReactNode; emptyState?: ReactNode }) {
   const dark = page.theme === 'dark'
   const groupById = new Map((page.groups ?? []).map((group) => [group.id, group]))
   const links = [...page.links].sort((left, right) => left.position - right.position)
   const style = {
-    '--page-accent': page.accentColor ?? '#111111',
+    '--page-accent': page.accentColor ?? (dark ? '#00d8ef' : '#111111'),
   } as CSSProperties
 
   return (
     <article
       className={`page-renderer mx-auto w-full max-w-xl px-5 py-10 sm:px-8 sm:py-14 ${dark ? 'bg-[#151515] text-[#f7f4ed]' : 'bg-white text-[#171715]'}`}
       style={style}
+      data-theme={page.theme}
+      data-layout={page.layout}
     >
       {page.owner ? (
         <header className="mx-auto max-w-xl text-center">
-          {page.owner.avatarUrl ? (
+          {avatarOverride ?? (page.owner.avatarUrl ? (
             <img src={page.owner.avatarUrl} alt="" className="mx-auto mb-6 h-24 w-24 rounded-full object-cover sm:h-28 sm:w-28" />
           ) : (
             <div aria-hidden="true" className={`mx-auto mb-6 grid h-24 w-24 place-items-center rounded-full border sm:h-28 sm:w-28 ${dark ? 'border-white/25' : 'border-black/20'} font-display text-3xl`}>
               {Array.from(page.owner.displayName)[0]?.toUpperCase() ?? '?'}
             </div>
-          )}
+          ))}
           <p className={`font-mono text-xs uppercase tracking-[0.16em] ${dark ? 'text-white/60' : 'text-black/55'}`}>@{page.owner.username}</p>
           <h1 className="mt-2 font-display text-4xl font-medium tracking-tight sm:text-5xl">
             {page.title?.trim() || page.owner.displayName}
@@ -118,6 +120,7 @@ export function PageRenderer({ page }: { page: PageRenderModel }) {
           )
         })}
       </ul>
+      {!links.some(link => link.status === 'active' && link.isVisible) ? emptyState : null}
 
       {page.showBranding ? (
         <footer className={`mt-12 text-center font-mono text-[0.625rem] uppercase tracking-[0.16em] ${dark ? 'text-white/40' : 'text-black/40'}`}>
