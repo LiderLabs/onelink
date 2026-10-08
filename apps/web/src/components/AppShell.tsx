@@ -21,12 +21,14 @@ export function AppShell() {
   const loginMatch = useMatch('/login')
   const registerMatch = useMatch('/register')
   const creatorPage = useMatch('/app/*')
+  const landingPage = useMatch('/')
   const authPage = Boolean(loginMatch || registerMatch)
   const maintenanceSetting = settings?.settings['platform.maintenance_mode']
   const maintenanceEnabled = maintenanceSetting === true || maintenanceSetting === 'true'
   const maintenanceMessage = settings?.settings['platform.maintenance_message']
 
   if (creatorPage) return <CreatorShell />
+  if (landingPage) return <Outlet />
 
   return (
     <div className={`flex min-h-screen flex-col${authPage ? ` auth-shell auth-shell-${registerMatch ? 'register' : 'login'}` : ' console-page'}`}>

@@ -1,5 +1,10 @@
 import type { CSSProperties, ReactNode } from 'react'
+import { ArrowUpRight, MapPin } from '@phosphor-icons/react'
+import { OneLinkBrand } from '../../components/OneLinkBrand'
+import { SocialIcon } from '../../components/SocialIcon'
+import { platformLabel } from '../profile/social-platforms'
 import type { PageLink, PageLayout, PageTheme, PublicPageOwner } from '../../lib/types'
+import './page-renderer.css'
 
 export interface PageRenderModel {
   slug: string
@@ -24,47 +29,54 @@ function safeHttpUrl(value: string): string | null {
 }
 
 export function PageRenderer({ page, avatarOverride, emptyState }: { page: PageRenderModel; avatarOverride?: ReactNode; emptyState?: ReactNode }) {
-  const dark = page.theme === 'dark'
   const groupById = new Map((page.groups ?? []).map((group) => [group.id, group]))
   const links = [...page.links].sort((left, right) => left.position - right.position)
+  const accent = page.accentColor ?? '#00d8ef'
+  const channels = /^#[\da-f]{6}$/i.test(accent)
+    ? [1, 3, 5].map(offset => {
+      const channel = parseInt(accent.slice(offset, offset + 2), 16) / 255
+      return channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4
+    }) : null
+  const luminance = channels?.reduce((total, channel, index) => total + channel * ([.2126, .7152, .0722][index] ?? 0), 0) ?? 1
   const style = {
-    '--page-accent': page.accentColor ?? (dark ? '#00d8ef' : '#111111'),
+    '--page-accent': accent,
+    '--page-button-text': luminance > .179 ? '#000000' : '#ffffff',
   } as CSSProperties
 
   return (
     <article
-      className={`page-renderer mx-auto w-full max-w-xl px-5 py-10 sm:px-8 sm:py-14 ${dark ? 'bg-[#151515] text-[#f7f4ed]' : 'bg-white text-[#171715]'}`}
+      className="page-renderer"
       style={style}
       data-theme={page.theme}
       data-layout={page.layout}
     >
       {page.owner ? (
-        <header className="mx-auto max-w-xl text-center">
-          {avatarOverride ?? (page.owner.avatarUrl ? (
-            <img src={page.owner.avatarUrl} alt="" className="mx-auto mb-6 h-24 w-24 rounded-full object-cover sm:h-28 sm:w-28" />
-          ) : (
-            <div aria-hidden="true" className={`mx-auto mb-6 grid h-24 w-24 place-items-center rounded-full border sm:h-28 sm:w-28 ${dark ? 'border-white/25' : 'border-black/20'} font-display text-3xl`}>
-              {Array.from(page.owner.displayName)[0]?.toUpperCase() ?? '?'}
-            </div>
-          ))}
-          <p className={`font-mono text-xs uppercase tracking-[0.16em] ${dark ? 'text-white/60' : 'text-black/55'}`}>@{page.owner.username}</p>
-          <h1 className="mt-2 font-display text-4xl font-medium tracking-tight sm:text-5xl">
+        <header className="page-profile">
+          <div className="page-avatar">
+            {avatarOverride ?? (page.owner.avatarUrl ? (
+              <img src={page.owner.avatarUrl} alt="" />
+            ) : (
+              <span aria-hidden="true">{Array.from(page.owner.displayName)[0]?.toUpperCase() ?? '?'}</span>
+            ))}
+          </div>
+          <h1>
             {page.title?.trim() || page.owner.displayName}
           </h1>
-          {page.owner.pronouns ? <p className={`mt-2 text-sm ${dark ? 'text-white/60' : 'text-black/55'}`}>{page.owner.pronouns}</p> : null}
-          {page.bio ? <p className={`mx-auto mt-5 max-w-md whitespace-pre-wrap text-base leading-7 ${dark ? 'text-white/75' : 'text-black/70'}`}>{page.bio}</p> : null}
-          {page.owner.bio ? <p className={`mx-auto mt-3 max-w-md whitespace-pre-wrap text-sm leading-6 ${dark ? 'text-white/55' : 'text-black/55'}`}>{page.owner.bio}</p> : null}
-          {page.owner.location ? <p className={`mt-3 font-mono text-[0.6875rem] uppercase tracking-[0.12em] ${dark ? 'text-white/45' : 'text-black/45'}`}>{page.owner.location}</p> : null}
+          <p className="page-handle">@{page.owner.username}</p>
+          {page.owner.pronouns ? <p className="page-pronouns">{page.owner.pronouns}</p> : null}
+          {page.bio ? <p className="page-bio">{page.bio}</p> : null}
+          {page.owner.bio && page.owner.bio.trim() !== page.bio?.trim() ? <p className="page-bio page-owner-bio">{page.owner.bio}</p> : null}
+          {page.owner.location ? <p className="page-location"><MapPin size={15} aria-hidden="true" />{page.owner.location}</p> : null}
           {page.owner.socials.length ? (
-            <nav aria-label={`${page.owner.displayName} social links`} className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2">
-              {page.owner.socials.map((social) => {
+            <nav aria-label={`${page.owner.displayName} social links`} className="page-socials">
+              {[...page.owner.socials].sort((left, right) => left.position - right.position).map((social) => {
                 const href = safeHttpUrl(social.url)
                 return href ? (
-                  <a key={`${social.platform}-${social.url}`} href={href} rel="noopener noreferrer" className={`text-xs underline underline-offset-4 ${dark ? 'text-white/70' : 'text-black/65'}`}>
-                    {social.platform}
+                  <a key={`${social.platform}-${social.url}`} href={href} rel="noopener noreferrer" aria-label={`${platformLabel(social.platform)} profile`} title={platformLabel(social.platform)} className="page-social-icon">
+                    <SocialIcon platform={social.platform} label={platformLabel(social.platform)} size={19} />
                   </a>
                 ) : (
-                  <span key={`${social.platform}-${social.url}`} className={`text-xs ${dark ? 'text-white/50' : 'text-black/45'}`}>
+                  <span key={`${social.platform}-${social.url}`} className="page-social-unavailable">
                     {social.platform}
                   </span>
                 )
@@ -73,14 +85,14 @@ export function PageRenderer({ page, avatarOverride, emptyState }: { page: PageR
           ) : null}
         </header>
       ) : (
-        <header className="mx-auto max-w-xl text-center">
-          <p className={`font-mono text-xs uppercase tracking-[0.16em] ${dark ? 'text-white/55' : 'text-black/50'}`}>/{page.slug}</p>
-          <h1 className="mt-3 font-display text-4xl font-medium tracking-tight sm:text-5xl">{page.title?.trim() || page.slug}</h1>
-          {page.bio ? <p className={`mx-auto mt-5 max-w-lg whitespace-pre-wrap text-base leading-relaxed ${dark ? 'text-white/70' : 'text-black/65'}`}>{page.bio}</p> : null}
+        <header className="page-profile">
+          <h1>{page.title?.trim() || page.slug}</h1>
+          <p className="page-handle">/{page.slug}</p>
+          {page.bio ? <p className="page-bio">{page.bio}</p> : null}
         </header>
       )}
 
-      <ul className={`mx-auto mt-8 grid max-w-xl gap-3 sm:mt-10 ${page.layout === 'grid' ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
+      <ul className="page-links">
         {links.filter((link) => link.status === 'active' && link.isVisible).map((link) => {
           const href = safeHttpUrl(link.url)
           const groupName = link.groupId ? groupById.get(link.groupId)?.name : undefined
@@ -91,28 +103,27 @@ export function PageRenderer({ page, avatarOverride, emptyState }: { page: PageR
                   href={href}
                   target={link.openInNewTab ? '_blank' : undefined}
                   rel={link.openInNewTab ? 'noopener noreferrer' : undefined}
-                  className={`group block h-full border px-5 py-4 transition-transform hover:-translate-y-0.5 ${dark ? 'border-white/20 hover:border-white/60' : 'border-black/20 hover:border-black/70'}`}
-                  style={{ borderInlineStartColor: 'var(--page-accent)' }}
+                  className="page-link"
                 >
                   {link.thumbnailKey ? (
                     <img
                       src={`/api/v1/media/files/${link.thumbnailKey}`}
                       alt=""
                       loading="lazy"
-                      className="mb-3 aspect-16/7 w-full object-cover"
+                      className="page-link-thumbnail"
                     />
                   ) : null}
-                  {groupName ? <span className={`mb-2 block font-mono text-[0.6rem] uppercase tracking-[0.16em] ${dark ? 'text-white/45' : 'text-black/45'}`}>{groupName}</span> : null}
-                  <span className="flex items-center justify-between gap-4">
-                    <span className="min-w-0">
-                      <span className="block wrap-break-word font-medium">{link.title}</span>
-                      {link.description ? <span className={`mt-1 block whitespace-pre-wrap text-sm leading-relaxed ${dark ? 'text-white/55' : 'text-black/55'}`}>{link.description}</span> : null}
+                  {groupName ? <span className="page-link-group">{groupName}</span> : null}
+                  <span className="page-link-content">
+                    <span className="page-link-copy">
+                      <span className="page-link-title">{link.title}</span>
+                      {link.description ? <span className="page-link-description">{link.description}</span> : null}
                     </span>
-                    <span aria-hidden="true" className="shrink-0 font-mono text-sm">↗</span>
+                    <ArrowUpRight size={19} aria-hidden="true" className="page-link-arrow" />
                   </span>
                 </a>
               ) : (
-                <span className="block border border-danger px-5 py-4 text-sm text-danger">
+                <span className="page-link-unavailable">
                   {link.title} — link unavailable
                 </span>
               )}
@@ -123,8 +134,8 @@ export function PageRenderer({ page, avatarOverride, emptyState }: { page: PageR
       {!links.some(link => link.status === 'active' && link.isVisible) ? emptyState : null}
 
       {page.showBranding ? (
-        <footer className={`mt-12 text-center font-mono text-[0.625rem] uppercase tracking-[0.16em] ${dark ? 'text-white/40' : 'text-black/40'}`}>
-          OneLink
+        <footer className="page-branding">
+          <a href="/" aria-label="OneLink home"><OneLinkBrand /></a>
         </footer>
       ) : null}
     </article>

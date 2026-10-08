@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
+import { LinkSimple, Plus } from '@phosphor-icons/react'
 import { errorMessageFor, fieldErrorsFrom } from '../../lib/api'
 import { useResource } from '../../lib/use-resource'
 import { Button } from '../../components/Button'
@@ -49,12 +50,14 @@ export interface SocialsEditorProps {
   blockedReason: ReactNode
   onPreviewChange?: (socials: PreviewSocials) => void
   onStateChange?: (state: { pending: boolean; dirty: boolean }) => void
+  compact?: boolean
 }
 
-export function SocialsEditor({ readable, writable, blockedReason, onPreviewChange, onStateChange }: SocialsEditorProps) {
+export function SocialsEditor({ readable, writable, blockedReason, onPreviewChange, onStateChange, compact = false }: SocialsEditorProps) {
   const socials = useResource(socialsApi.list, { enabled: readable })
 
   const [pending, setPending] = useState(false)
+  const [adding, setAdding] = useState(!compact)
   const [error, setError] = useState<unknown>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<{ platform?: string; url?: string }>({})
@@ -188,11 +191,11 @@ export function SocialsEditor({ readable, writable, blockedReason, onPreviewChan
   }
 
   return (
-    <section aria-labelledby="socials" className="profile-section profile-socials">
+    <section aria-labelledby="socials" className={`profile-section profile-socials${compact ? ' is-compact' : ''}`}>
       <div className="profile-section-heading">
         <div>
           <p className="profile-section-number" aria-hidden="true">01</p>
-          <h2 id="socials">Social links</h2>
+          <h2 id="socials">{compact ? <><LinkSimple size={21} />Social profiles</> : 'Social links'}</h2>
         </div>
         {readable ? (
           <p className="profile-section-note">
@@ -246,6 +249,7 @@ export function SocialsEditor({ readable, writable, blockedReason, onPreviewChan
                   social={social}
                   index={index}
                   count={list.length}
+                  compact={compact}
                   writable={writable}
                   busy={pending}
                   onPreviewChange={rowPreview}
@@ -267,7 +271,9 @@ export function SocialsEditor({ readable, writable, blockedReason, onPreviewChan
           ) : null}
 
           {writable && !atCap ? (
-            <form onSubmit={(event) => void add(event)} noValidate className="profile-social-add mt-8 space-y-5">
+            <>
+            {compact && !adding ? <button type="button" className="creator-button creator-button-subtle creator-editor-add-social" onClick={() => setAdding(true)}><Plus size={17} />Add a social profile</button> : null}
+            <form hidden={!adding} onSubmit={(event) => void add(event)} noValidate className="profile-social-add mt-8 space-y-5">
               <p className="eyebrow">Add a social link</p>
 
               <div className="grid gap-5 sm:grid-cols-2">
@@ -303,9 +309,10 @@ export function SocialsEditor({ readable, writable, blockedReason, onPreviewChan
               />
 
               <Button type="submit" pending={pending} pendingLabel="Adding">
-                Add link
+                {compact ? <Plus size={16} /> : null}Add link
               </Button>
             </form>
+            </>
           ) : null}
         </>
       )}

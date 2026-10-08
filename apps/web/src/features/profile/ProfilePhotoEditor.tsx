@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
+import { Trash, UploadSimple } from '@phosphor-icons/react'
 import { Button } from '../../components/Button'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { ApiError, errorMessageFor } from '../../lib/api'
@@ -13,8 +14,8 @@ import { ProfileAvatar } from './ProfileAvatar'
 import { initialCrop } from '../media/crop'
 import type { PreviewPhoto } from './ProfilePreview'
 
-export function ProfilePhotoEditor({ user, readable, writable, onBusyChange, onPreviewChange }: {
-  user: SessionUser; readable: boolean; writable: boolean; onBusyChange: (busy: boolean) => void; onPreviewChange?: (photo: PreviewPhoto | null) => void
+export function ProfilePhotoEditor({ user, readable, writable, onBusyChange, onPreviewChange, compact = false }: {
+  user: SessionUser; readable: boolean; writable: boolean; onBusyChange: (busy: boolean) => void; onPreviewChange?: (photo: PreviewPhoto | null) => void; compact?: boolean
 }) {
   const session = useSession()
   const input = useRef<HTMLInputElement>(null)
@@ -174,14 +175,14 @@ export function ProfilePhotoEditor({ user, readable, writable, onBusyChange, onP
     } finally { if (mounted.current) changePhase('idle') }
   }
 
-  return <section className="profile-section profile-photo" aria-labelledby="photo">
+  return <section className={`profile-section profile-photo${compact ? ' is-compact' : ''}`} aria-labelledby="photo">
     <div className="profile-section-heading"><div><p className="profile-section-number" aria-hidden="true">01</p><h2 id="photo">Profile photo</h2></div><span className="profile-section-note">A familiar face</span></div>
     <div className="profile-photo-controls">
       <ProfileAvatar avatarKey={user.avatarKey} displayName={user.displayName} className="profile-photo-avatar" />
-      <div><p className="profile-section-description">Make it yours. Choose a photo and find your frame.</p>
+      <div><p className="profile-section-description">{compact ? 'Profile picture' : 'Make it yours. Choose a photo and find your frame.'}</p>
         <div className="profile-photo-buttons">
-          <Button type="button" variant="outline" disabled={!writable || !loaded || phase !== 'idle'} onClick={() => input.current?.click()}>{user.avatarKey ? 'Change photo' : 'Upload photo'}</Button>
-          {user.avatarKey ? <button type="button" disabled={!writable || !loaded || phase !== 'idle'} onClick={() => setRemoveOpen(true)}>Remove photo</button> : null}
+          <Button type="button" variant="outline" disabled={!writable || !loaded || phase !== 'idle'} onClick={() => input.current?.click()}>{compact ? <UploadSimple size={16} /> : null}{user.avatarKey ? 'Change photo' : 'Upload photo'}</Button>
+          {user.avatarKey ? <button type="button" className={compact ? 'creator-icon-button' : undefined} aria-label="Remove photo" title="Remove photo" disabled={!writable || !loaded || phase !== 'idle'} onClick={() => setRemoveOpen(true)}>{compact ? <Trash size={17} /> : 'Remove photo'}</button> : null}
         </div>
         <p className="profile-photo-help">JPEG, PNG or WebP. Up to 10 MB.</p>
       </div>

@@ -69,7 +69,7 @@ export function DesignTab() {
                 label="Theme"
                 value={draftPage.theme}
                 disabled={disabled}
-                options={[{ value: 'light', label: 'Light paper' }, { value: 'dark', label: 'Dark ink' }]}
+                options={[{ value: 'light', label: 'Black with cyan glow' }, { value: 'dark', label: 'Solid black' }]}
                 onChange={(event) => patchPage({ theme: event.currentTarget.value === 'dark' ? 'dark' : 'light' })}
               />
               <SelectField

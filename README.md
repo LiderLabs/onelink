@@ -88,7 +88,7 @@ the `__Host-` session cookie does not exist.
 | --- | --- |
 | `/login`, `/register` | sign in, create an account |
 | `/forgot-password`, `/reset-password` | the reset flow (generated links use these) |
-| `/` | redirects to `/app` |
+| `/` | public landing page with links to sign in and create an account |
 | `/app` | dashboard: identity preview, page summary, links and quick actions |
 | `/app/editor` | the merged editor; full-width, owns its own chrome, no console rail |
 | `/app/editor/profile`, `/links`, `/design`, `/analytics`, `/settings` | the five editor tabs; `/app/editor` alone lands on Profile |

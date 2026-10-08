@@ -84,6 +84,20 @@
 .auth-layout { position: relative; width: min(100%, 28.75rem); }
 .auth-layout-register { width: min(100%, 30.625rem); }
 
+.auth-home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  min-height: 44px;
+  margin-bottom: .5rem;
+  padding-inline: .25rem;
+  border-radius: .375rem;
+  color: var(--auth-accent);
+  font-size: .875rem;
+  text-decoration: none;
+}
+.auth-home-link:hover { color: #87f3ff; text-decoration: underline; text-underline-offset: .25rem; }
+
 .auth-form-panel {
   width: 100%;
   padding: 1.75rem 2.5rem 2rem;
