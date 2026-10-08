@@ -18,9 +18,14 @@ apps/api
 
 apps/web
   src/lib          typed API client, session store, formatting, resource/dirty-form hooks
-  src/components   shell, console layout, auth frame, field/button/notice/dialog primitives
-  src/features     profile (identity, socials, security), public (slug layout)
-  src/routes       login, register, forgot-password, reset-password, profile, console 404
+  src/components   shell, console layout/rail, auth frame, field/button/notice/dialog/panel/
+                   toolbar/icon primitives
+  src/features     editor (the merged profile/links/design/analytics/settings tabs),
+                   console (dashboard, Release 2 placeholders), pages (list, create),
+                   profile (identity, socials, security), public (slug layout)
+  src/routes       login, register, forgot-password, reset-password, console 404
+  src/styles.css   the design-token layer (ink/paper/rule colors, display + mono type)
+                   Tailwind v4 utilities are built on
 ```
 
 The SPA is served by the API Worker itself (`assets.directory` in
@@ -38,10 +43,10 @@ no CORS, no `SameSite=None`, and no custom domain.
 ```bash
 npm install
 cp .dev.vars.example .dev.vars      # then edit the values (repository root)
-npm run db:migrate:local
+npm run db:migrate:local            # idempotent; `npm run dev` also runs this first (predev)
 npm run db:seed:local
 npm run db:seed:owner               # prints the owner credentials
-npm run dev                         # wrangler dev (API) on http://localhost:8787
+npm run dev                         # migrates, then wrangler dev (API) on http://localhost:8787
 npm run dev:web                     # in a second terminal: Vite on http://localhost:5173
 ```
 
@@ -84,19 +89,20 @@ the `__Host-` session cookie does not exist.
 | `/login`, `/register` | sign in, create an account |
 | `/forgot-password`, `/reset-password` | the reset flow (generated links use these) |
 | `/` | redirects to `/app` |
-| `/app` | dashboard with profile/social editing, page summary, links and quick actions |
-| `/app/pages`, `/app/pages/new`, `/app/pages/:id` | page list, creation, and editor |
-| `/app#profile-editor`, `/app#socials` | dashboard anchors for the inline profile and social editors |
-| `/app/profile`, `/app/socials` | compatibility redirects to the dashboard editor |
-| `/app/analytics` | honest unavailable-state screen; analytics are not collected |
-| `/app/settings` | existing page/sharing tools and clearly unavailable Release 2 capabilities |
+| `/app` | dashboard: identity preview, page summary, links and quick actions |
+| `/app/editor` | the merged editor; full-width, owns its own chrome, no console rail |
+| `/app/editor/profile`, `/links`, `/design`, `/analytics`, `/settings` | the five editor tabs; `/app/editor` alone lands on Profile |
+| `/app/pages`, `/app/pages/new` | page list and creation |
+| `/app/pages/:id` | compatibility redirect into the editor: `?page=<id>` selects the page, `#hash` selects the tab |
+| `/app#profile-editor`, `/app#socials` | compatibility hash redirects to the Profile tab |
+| `/app/profile`, `/app/socials`, `/app/analytics`, `/app/settings` | compatibility redirects to the matching editor tab |
 | `/app/submissions` | no submissions are collected; export is unavailable |
-| `/profile` | compatibility redirect to the dashboard profile editor |
+| `/profile` | compatibility redirect to the Profile tab |
 | `/:slug`, `/p/:slug` | public page renderer |
 | any unmatched path under `/app/` | a console 404 that cannot fall through to a slug |
 
-The dashboard embeds profile and social editing alongside the page summary and
-links. Those resources still behave differently on purpose:
+Identity, the avatar and social links now live in the editor's **Profile** tab, and
+the dashboard links to it. Those resources still behave differently on purpose:
 
 - **Identity** is `PATCH /api/v1/auth/me` (R1.1/R1.2). Only changed fields are sent,
   an emptied optional box is sent as `null`, and the response is *merged* over the
@@ -117,12 +123,16 @@ links. Those resources still behave differently on purpose:
 The dashboard is backed by the owner's page and link DTOs. Its page card offers
 preview/open, copy/share, and publish actions; publish is disabled when the
 published page has no unpublished changes. Link rows show actual saved titles,
-addresses, and visibility, with editing routed to the page editor. Analytics and
+addresses, and visibility, with editing routed to the editor's Links tab. Analytics and
 recent activity say “not collected” because views, clicks, and submissions are
 not yet recorded.
 
-The profile preview can switch between mobile and desktop widths. The page
-editor remains focused on page-specific links and design. Link creation and
+The editor is one full-width screen with five tabs — Profile, Links, Design,
+Analytics and Settings — that owns its own chrome rather than nesting inside the
+console rail. Its layout draft is written back by autosave (a 700 ms debounce) and
+applied to the live page by Publish, so the status it shows is the server's
+`unpublishedChanges` and not a client guess. The Design tab's preview can switch
+between mobile and desktop widths. Link creation and
 editing use a modal with URL metadata suggestions, group assignment, new-tab
 behavior, visibility, scheduling, and optional thumbnail upload. Group filters
 and a separate hidden-links section operate on the current draft.
@@ -135,7 +145,7 @@ normalized values, so the second submit diffs against what is actually stored.
 ## Tests and typecheck
 
 ```bash
-npm test          # 286 API tests in 15 files, run in workerd against local D1/R2
+npm test          # 305 API tests in 17 files, run in workerd against local D1/R2
 npm run typecheck # regenerates worker-configuration.d.ts, then typechecks both workspaces
 ```
 

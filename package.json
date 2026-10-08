@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "predev": "npm run db:migrate:local",
     "dev": "npm run dev -w @onelink/api",
     "dev:web": "npm run dev -w @onelink/web",
     "build": "npm run build -w @onelink/web",

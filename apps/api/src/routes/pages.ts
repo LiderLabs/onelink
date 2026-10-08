@@ -42,6 +42,7 @@ import {
   savePageDraft,
 } from '../services/page-draft.service'
 import { fetchLinkMetadata } from '../services/link-metadata.service'
+import { getPageAnalytics } from '../services/analytics.service'
 import {
   listAccessiblePages,
   requirePageAccess,
@@ -93,6 +94,13 @@ export const pageRoutes = new Hono<AppEnv>()
 
 const writeLimit = rateLimit('pages_write_user')
 const autosaveLimit = rateLimit('page_autosave_user', { rejectThrottle: true })
+
+pageRoutes.get('/:id/analytics', requireActiveAccount, requirePasswordSettled, async (c) => {
+  const { page } = await requirePageAccess(c.env.DB, actorInfoOf(currentUser(c)), c.req.param('id'))
+  const rawDays = c.req.query('days') ?? '30'
+  if (!['7', '30', '90'].includes(rawDays)) throw badRequest('Analytics days must be 7, 30 or 90.')
+  return ok(c, await getPageAnalytics(c.env.DB, page.id, Number(rawDays)))
+})
 
 // --------------------------------------------------------------------- read --
 

@@ -5,12 +5,22 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorNotice } from '../../components/ErrorNotice'
 import { Splash } from '../../components/StatusScreens'
+import { Toolbar } from '../../components/Toolbar'
 import { errorMessageFor } from '../../lib/api'
 import { formatRelative } from '../../lib/css'
-import type { OwnerPage } from '../../lib/types'
+import type { OwnerPage, PageStatus } from '../../lib/types'
 import { deletePage, listMyPages, publicPagePath } from './api'
 
 const PAGE_SIZE = 12
+
+// The statuses the list can be narrowed to.
+//
+// `GET /pages/mine` takes `page` and `limit` and nothing else, so there is no
+// server-side `status` query to lean on. The filter therefore runs over what is
+// already loaded, and the count line says "of N loaded" whenever more than one
+// page of results exists — it never claims to have searched the whole list. A
+// server-side filter is a change in `apps/api`, not something to fake here.
+const FILTERABLE_STATUSES: readonly PageStatus[] = ['published', 'draft', 'archived']
 
 export function PageListRoute() {
   const [params, setParams] = useSearchParams()
@@ -56,6 +66,28 @@ export function PageListRoute() {
       if (nextPage > 1) next.set('page', String(nextPage))
       else next.delete('page')
       return next
+    })
+  }
+
+  // `?status=` is validated against the allowlist, so a hand-typed value in the
+  // address bar reads as "no filter" rather than as an empty list.
+  const statusFilter = FILTERABLE_STATUSES.find((status) => status === params.get('status')) ?? null
+  const visiblePages = pages?.filter((page) => statusFilter === null || page.status === statusFilter) ?? null
+  // Only offer a chip for a status that is present — plus the active one, so a
+  // filter that just emptied itself (its last page was deleted) stays visible and
+  // clearable instead of silently sticking.
+  const statusChips = FILTERABLE_STATUSES.filter(
+    (status) => status === statusFilter || (pages?.some((page) => page.status === status) ?? false),
+  )
+
+  const setStatusFilter = (next: PageStatus | null) => {
+    setParams((previous) => {
+      const updated = new URLSearchParams(previous)
+      if (next === null) updated.delete('status')
+      else updated.set('status', next)
+      // `page` is deliberately left alone: the filter narrows the loaded page, so
+      // walking the list keeps it and each page shows its own slice.
+      return updated
     })
   }
 
@@ -107,15 +139,53 @@ export function PageListRoute() {
       ) : (
         <>
           {meta ? (
-            <div className="mt-6 flex items-center justify-between gap-4">
-              <p className="eyebrow">{meta.total} {meta.total === 1 ? 'page' : 'pages'}</p>
-              <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
-                {meta.total === 0 ? 'No results' : `${(meta.page - 1) * meta.limit + 1}–${Math.min(meta.page * meta.limit, meta.total)} of ${meta.total}`}
-              </p>
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+              {statusChips.length > 1 ? (
+                <Toolbar label="Filter pages by status">
+                  <Button
+                    size="sm"
+                    variant={statusFilter === null ? 'solid' : 'outline'}
+                    aria-pressed={statusFilter === null}
+                    onClick={() => setStatusFilter(null)}
+                  >
+                    All
+                  </Button>
+                  {statusChips.map((status) => (
+                    <Button
+                      key={status}
+                      size="sm"
+                      variant={statusFilter === status ? 'solid' : 'outline'}
+                      aria-pressed={statusFilter === status}
+                      onClick={() => setStatusFilter(status)}
+                    >
+                      {status}
+                    </Button>
+                  ))}
+                </Toolbar>
+              ) : null}
+              <div className="ml-auto text-right">
+                <p className="eyebrow">{meta.total} {meta.total === 1 ? 'page' : 'pages'}</p>
+                <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
+                  {statusFilter === null
+                    ? meta.total === 0
+                      ? 'No results'
+                      : `${(meta.page - 1) * meta.limit + 1}–${Math.min(meta.page * meta.limit, meta.total)} of ${meta.total}`
+                    : meta.totalPages === 1
+                      ? `${visiblePages?.length ?? 0} of ${meta.total}`
+                      : `${visiblePages?.length ?? 0} of ${pages?.length ?? 0} loaded`}
+                </p>
+              </div>
             </div>
           ) : null}
+          {meta && statusFilter !== null && visiblePages?.length === 0 ? (
+            <p className="mt-4 border border-rule bg-white/60 px-5 py-6 text-sm leading-relaxed text-ink-soft">
+              {meta.totalPages === 1
+                ? `No ${statusFilter} pages here.`
+                : `No ${statusFilter} pages among the ${pages?.length ?? 0} loaded — move through the pages below to check the rest.`}
+            </p>
+          ) : null}
           <div className="mt-4 grid gap-3">
-            {pages?.map((page, index) => (
+            {visiblePages?.map((page, index) => (
               <article key={page.id} className="grid gap-4 border border-rule bg-white/80 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-5" style={{ animationDelay: `${Math.min(index, 7) * 45}ms` }}>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

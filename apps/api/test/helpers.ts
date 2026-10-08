@@ -333,6 +333,7 @@ const VOLATILE_TABLES = [
   'user_notes',
   'sanctions',
   'reports',
+  'page_analytics_daily',
   'media_assets',
   'page_revisions',
   'page_invitations',

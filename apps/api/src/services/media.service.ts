@@ -36,16 +36,13 @@ import type { ActorInfo, Auditor, MediaAssetRow } from '../types'
 // never reaches here at all — `bodyLimit` in `app.ts` answers that with a generic
 // `413` before the request is parsed.
 //
-// **R2 goes first on write and first on delete**, and the two orders are not the
-// same order for the same reason:
+// **The D1 tombstone is the recovery record for every cross-store operation.**
+// Uploads create it before R2 is touched; deletes commit it before removing R2.
+// This leaves a durable key for maintenance whether the Worker fails during the
+// upload, during compensation, or after retirement.
 //
-//   * `DELETE` removes the object, THEN the row. A row whose object is gone is a
-//     broken avatar (a `404` on a live page); an object whose row is gone is
-//     invisible garbage a sweep can find later. The second failure is the one to
-//     prefer, so the object goes first.
-//   * `POST` writes the object, then the row, and DELETES the object again if the
-//     row cannot commit. Nothing may serve an object no row describes, so the
-//     compensation is what makes that order safe.
+// Tombstones are never served. Maintenance retries R2 deletion and removes the
+// D1 row only after storage deletion succeeds.
 //
 // Both mutations claim their audit entry before any write and bind it into the
 // SAME `db.batch()` as the change it describes — so the log row commits with the
@@ -158,10 +155,6 @@ export async function createMediaAsset(
     },
   })
 
-  await bucket.put(key, input.bytes, {
-    httpMetadata: { contentType: sniffed.mime, cacheControl: MEDIA_CACHE_CONTROL },
-  })
-
   const checksum = await sha256HexOfBytes(input.bytes)
   const row: MediaAssetRow = {
     id,
@@ -182,37 +175,67 @@ export async function createMediaAsset(
     deleted_at: null,
   }
 
+  // Persist a tombstone before touching R2. If the Worker stops between the
+  // object write and activation, maintenance still has the key to clean up.
+  await db
+    .prepare(
+      `INSERT INTO media_assets (
+         id, owner_user_id, page_id, r2_key, bucket, kind, original_filename,
+         mime, size_bytes, width, height, checksum, uploaded_by, status,
+         created_at, deleted_at
+       ) VALUES (?,?,NULL,?,'public',?,?,?,?,?,?,?,?,'deleted',?,?)`,
+    )
+    .bind(
+      row.id,
+      row.owner_user_id,
+      row.r2_key,
+      row.kind,
+      row.original_filename,
+      row.mime,
+      row.size_bytes,
+      row.width,
+      row.height,
+      row.checksum,
+      row.uploaded_by,
+      row.created_at,
+      timestamp,
+    )
+    .run()
+
   try {
+    await bucket.put(key, input.bytes, {
+      httpMetadata: { contentType: sniffed.mime, cacheControl: MEDIA_CACHE_CONTROL },
+    })
+
     await db.batch([
       db
         .prepare(
-          `INSERT INTO media_assets (
-             id, owner_user_id, page_id, r2_key, bucket, kind, original_filename,
-             mime, size_bytes, width, height, checksum, uploaded_by, status,
-             created_at, deleted_at
-           ) VALUES (?,?,NULL,?,'public',?,?,?,?,?,?,?,?,'active',?,NULL)`,
+          `UPDATE media_assets SET status='active', deleted_at=NULL
+            WHERE id=? AND status='deleted'`,
         )
-        .bind(
-          row.id,
-          row.owner_user_id,
-          row.r2_key,
-          row.kind,
-          row.original_filename,
-          row.mime,
-          row.size_bytes,
-          row.width,
-          row.height,
-          row.checksum,
-          row.uploaded_by,
-          row.created_at,
-        ),
-      auditInsertStmt(db, entry),
+        .bind(row.id),
+      auditInsertStmt(db, entry, true),
     ])
   } catch (error) {
-    // The write failed, so no row describes the object already in R2. Best-effort
-    // cleanup: a failure here leaves exactly the garbage a later sweep is for, which
-    // is why it must not replace the original error.
-    await bucket.delete(key).catch(() => undefined)
+    // Mark it non-public before compensating. If R2 deletion fails, the durable
+    // tombstone lets scheduled maintenance retry without exposing the object.
+    try {
+      const result = await db
+        .prepare("UPDATE media_assets SET status='deleted', deleted_at=coalesce(deleted_at, ?) WHERE id=?")
+        .bind(now(), id)
+        .run()
+      if (result.meta.changes !== 1) throw new Error('Could not retain the media cleanup record.')
+      await bucket.delete(key)
+      await db.prepare("DELETE FROM media_assets WHERE id=? AND status='deleted'").bind(id).run()
+    } catch (cleanupError) {
+      console.error(JSON.stringify({
+        level: 'error',
+        msg: 'media_upload_compensation_deferred',
+        key,
+        requestId: entry.requestId,
+        message: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      }))
+    }
     throw error
   }
 
@@ -245,13 +268,14 @@ export async function findOwnedMediaAsset(
 }
 
 /**
- * Removes one of the caller's own uploads.
+ * Retires one of the caller's own uploads.
  *
  * A foreign id and a missing id are the same `404`, so nothing here tells a caller
  * whether somebody else's asset exists.
  *
- * The middle statement is what keeps `users.avatar_key` from pointing at an object
- * that no longer exists: the delete nulls the avatar of the owner whose profile
+ * The D1 tombstone is committed before touching R2, so a failed delete remains
+ * hidden and recoverable. The user update keeps `users.avatar_key` from pointing at an object
+ * that no longer exists: retirement nulls the avatar of the owner whose profile
  * names this exact key. It is guarded by `avatar_key = ?` rather than run
  * unconditionally, so it touches nothing — not even `updated_at` — when the key
  * being deleted is not the one in use. Cleaning up an upload therefore cannot break
@@ -285,16 +309,24 @@ export async function deleteMediaAsset(
     },
   })
 
-  // Object first, row second — see the header for why this order is the safe one.
-  await bucket.delete(asset.r2_key)
-
-  await db.batch([
-    db.prepare('DELETE FROM media_assets WHERE id = ?').bind(asset.id),
+  const retiredAt = now()
+  const results = await db.batch([
+    db.prepare("UPDATE media_assets SET status='deleted', deleted_at=? WHERE id=? AND status='active'")
+      .bind(retiredAt, asset.id),
+    auditInsertStmt(db, entry, true),
     db
       .prepare('UPDATE users SET avatar_key = NULL, updated_at = ? WHERE id = ? AND avatar_key = ?')
-      .bind(now(), actor.id, asset.r2_key),
-    auditInsertStmt(db, entry),
+      .bind(retiredAt, actor.id, asset.r2_key),
   ])
+  if (results[0]?.meta.changes !== 1) throw notFound('Media asset')
+
+  // The D1 tombstone and audit are durable before R2 deletion. If either storage
+  // operation fails, public reads are blocked and maintenance can retry later.
+  await bucket.delete(asset.r2_key)
+  await db
+    .prepare("DELETE FROM media_assets WHERE id = ? AND status = 'deleted'")
+    .bind(asset.id)
+    .run()
 }
 
 /**

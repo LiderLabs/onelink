@@ -18,13 +18,15 @@ import { cx } from '../lib/css'
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   pending?: boolean
   pendingLabel?: string
-  variant?: 'solid' | 'outline' | 'danger'
+  variant?: 'solid' | 'outline' | 'danger' | 'ghost'
+  size?: 'sm' | 'md'
 }
 
 export function Button({
   pending = false,
   pendingLabel = 'Working',
   variant = 'solid',
+  size = 'md',
   className,
   children,
   disabled,
@@ -36,12 +38,15 @@ export function Button({
       disabled={disabled === true || pending}
       aria-busy={pending || undefined}
       className={cx(
-        'inline-flex items-center justify-center gap-2.5 px-5 py-3',
-        'font-mono text-xs uppercase tracking-[0.18em]',
+        'inline-flex items-center justify-center gap-2.5',
+        'font-mono uppercase tracking-[0.16em]',
         'border transition-[background-color,color,border-color,transform] duration-150',
         'active:translate-y-px disabled:cursor-not-allowed disabled:opacity-55',
+        size === 'md' && 'px-5 py-3 text-xs tracking-[0.18em]',
+        size === 'sm' && 'px-3.5 py-2 text-[0.6875rem]',
         variant === 'solid' && 'border-ink bg-ink text-paper hover:bg-paper hover:text-ink',
         variant === 'outline' && 'border-rule bg-transparent text-ink hover:border-ink hover:bg-paper-deep',
+        variant === 'ghost' && 'border-transparent bg-transparent text-ink-soft hover:border-rule hover:text-ink',
         // The one chromatic variant, reserved for an irreversible action
         // (UI-ROADMAP ground rule 3 / spec §4) — a filled black button and a
         // "Delete" label read as ordinary once they sit in a row of others.

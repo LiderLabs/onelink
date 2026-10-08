@@ -1,9 +1,16 @@
 import { Hono } from 'hono'
-import { normalizeSlug, ok } from '../lib/http'
+import { noContent, normalizeSlug, ok } from '../lib/http'
 import { capabilitiesOf, CAPABILITIES } from '../lib/rbac'
 import { ROLE_RANK, ROLES, STAFF_ROLES } from '../lib/constants'
+import { rateLimit } from '../middleware/rate-limit'
+import { recordPublicPageEvent } from '../services/analytics.service'
+import { createPageReport } from '../services/moderation.service'
 import { getPublicSettings, SETTING_KEYS } from '../services/settings.service'
 import { getPublicPage } from '../services/page.service'
+import { readJson } from './helpers'
+import { publicPageEventSchema } from '../validation/analytics.schema'
+import { createPageReportSchema } from '../validation/moderation.schema'
+import { getClientIp } from '../lib/http'
 import type { AppEnv } from '../types'
 
 // ============================================================================
@@ -27,6 +34,9 @@ const PUBLIC_SETTING_KEYS = new Set<string>([
 
 export const publicRoutes = new Hono<AppEnv>()
 
+const analyticsEventLimit = rateLimit('analytics_event_ip')
+const reportCreateLimit = rateLimit('report_create_ip')
+
 /**
  * Anonymous page read. The ONLY unauthenticated page surface.
  *
@@ -42,6 +52,29 @@ export const publicRoutes = new Hono<AppEnv>()
 publicRoutes.get('/pages/:slug', async (c) => {
   const slug = normalizeSlug(c.req.param('slug'))
   return ok(c, await getPublicPage(c.env.DB, slug))
+})
+
+publicRoutes.post('/pages/:slug/events', analyticsEventLimit, async (c) => {
+  const event = await readJson(c, publicPageEventSchema)
+  await recordPublicPageEvent(c.env.DB, c.req.param('slug'), event)
+  return noContent(c)
+})
+
+publicRoutes.post('/pages/:slug/reports', reportCreateLimit, async (c) => {
+  const body = await readJson(c, createPageReportSchema)
+  const user = c.get('user')
+  const report = await createPageReport(c.env.DB, {
+    slug: c.req.param('slug'),
+    targetType: body.targetType ?? 'page',
+    linkId: body.linkId ?? null,
+    category: body.category,
+    description: body.description ?? null,
+    reporterUserId: user?.id ?? null,
+    reporterLabel: user?.displayName ?? user?.username ?? null,
+    reporterEmail: body.email ?? null,
+    reporterIp: getClientIp(c),
+  }, c.get('auditor'))
+  return ok(c, { received: true }, { status: report.duplicate ? 200 : 201 })
 })
 
 publicRoutes.get('/settings', async (c) => {

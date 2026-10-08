@@ -22,6 +22,8 @@ import { mediaRoutes } from './routes/media'
 import { userRoutes } from './routes/users'
 import { settingsRoutes } from './routes/settings'
 import { auditRoutes } from './routes/audit'
+import { adminAppealRoutes, adminContentFlagRoutes, adminContentRoutes, moderationRoutes } from './routes/moderation'
+import { appealRoutes } from './routes/appeals'
 import { pageInvitationRoutes, pageMemberRoutes } from './routes/page-members'
 import type { AppEnv } from './types'
 
@@ -123,6 +125,11 @@ export function createApp() {
   app.route('/api/v1/admin/users', userRoutes)
   app.route('/api/v1/admin/settings', settingsRoutes)
   app.route('/api/v1/admin/audit-logs', auditRoutes)
+  app.route('/api/v1/admin/reports', moderationRoutes)
+  app.route('/api/v1/admin/appeals', adminAppealRoutes)
+  app.route('/api/v1/admin/content-flags', adminContentFlagRoutes)
+  app.route('/api/v1/admin/content', adminContentRoutes)
+  app.route('/api/v1/appeals', appealRoutes)
 
   return app
 }

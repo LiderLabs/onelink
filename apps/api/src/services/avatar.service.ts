@@ -16,30 +16,40 @@ export async function uploadAvatar(
   const image = validateAvatarWebp(bytes, declaredMime)
   const id = ulid()
   const key = `avatars/${actor.id}/${id}.webp`
+  const timestamp = now()
   const entry = auditor.claim({ action: 'media.upload', targetType: 'media', targetId: id, metadata: { kind: 'avatar', bytes: image.bytes } })
-  await env.PUBLIC_BUCKET.put(key, bytes, { httpMetadata: { contentType: image.mime } })
+
+  await env.DB.prepare(`INSERT INTO media_assets
+    (id,owner_user_id,r2_key,bucket,kind,mime,size_bytes,width,height,uploaded_by,status,created_at,deleted_at)
+    VALUES (?,?,?,'public','avatar',?,?,?,?,?,'deleted',?,?)`)
+    .bind(id, actor.id, key, image.mime, image.bytes, image.width, image.height, actor.id, timestamp, timestamp)
+    .run()
+
   try {
+    await env.PUBLIC_BUCKET.put(key, bytes, { httpMetadata: { contentType: image.mime } })
     await env.DB.batch([
-      env.DB.prepare(`INSERT INTO media_assets
-        (id,owner_user_id,r2_key,bucket,kind,mime,size_bytes,width,height,uploaded_by,status,created_at)
-        VALUES (?,?,?,'public','avatar',?,?,?,?,?,'active',?)`)
-        .bind(id, actor.id, key, image.mime, image.bytes, image.width, image.height, actor.id, now()),
-      auditInsertStmt(env.DB, entry),
+      env.DB.prepare("UPDATE media_assets SET status='active',deleted_at=NULL WHERE id=? AND status='deleted'")
+        .bind(id),
+      auditInsertStmt(env.DB, entry, true),
     ])
   } catch (error) {
     try {
-      await env.PUBLIC_BUCKET.delete(key)
+      await env.DB.prepare("UPDATE media_assets SET status='deleted',deleted_at=coalesce(deleted_at,?) WHERE id=?")
+        .bind(now(), id)
+        .run()
     } catch (cleanupError) {
-      try {
-        const timestamp = now()
-        await env.DB.prepare(
-          `INSERT INTO media_assets
-             (id,owner_user_id,r2_key,bucket,kind,mime,size_bytes,width,height,uploaded_by,status,created_at,deleted_at)
-           VALUES (?,?,?,'public','avatar',?,?,?,?,?,'deleted',?,?)
-           ON CONFLICT(id) DO UPDATE SET status='deleted', deleted_at=coalesce(deleted_at, excluded.deleted_at)`,
-        )
-          .bind(id, actor.id, key, image.mime, image.bytes, image.width, image.height, actor.id, timestamp, timestamp)
-          .run()
+      console.error(JSON.stringify({
+        level: 'error',
+        msg: 'media_upload_cleanup_deferred',
+        key,
+        requestId: entry.requestId,
+        message: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      }))
+    }
+    try {
+      await env.PUBLIC_BUCKET.delete(key)
+      await env.DB.prepare("DELETE FROM media_assets WHERE id=? AND status='deleted'").bind(id).run()
+    } catch (cleanupError) {
         console.error(JSON.stringify({
           level: 'warn',
           msg: 'media_upload_cleanup_deferred',
@@ -47,16 +57,6 @@ export async function uploadAvatar(
           requestId: entry.requestId,
           message: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
         }))
-      } catch (trackingError) {
-        console.error(JSON.stringify({
-          level: 'error',
-          msg: 'media_upload_compensation_failed',
-          key,
-          requestId: entry.requestId,
-          cleanupError: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-          trackingError: trackingError instanceof Error ? trackingError.message : String(trackingError),
-        }))
-      }
     }
     throw error
   }
@@ -81,7 +81,7 @@ export async function readPublicAvatar(env: Cloudflare.Env, key: string): Promis
 }
 
 /** Mark before deleting storage; a tombstone remains until storage cleanup succeeds. */
-export async function retireAvatar(env: Cloudflare.Env, row: MediaAssetRow, entry: AuditEntry, onlyIfUnattached = false): Promise<boolean> {
+export async function retirePublicMedia(env: Cloudflare.Env, row: MediaAssetRow, entry: AuditEntry, onlyIfUnattached = false): Promise<boolean> {
   const timestamp = now()
   const results = await env.DB.batch([
     env.DB.prepare(`UPDATE media_assets SET status='deleted', deleted_at=coalesce(deleted_at,?) WHERE id=?
@@ -103,5 +103,5 @@ export async function deleteOwnedAvatar(env: Cloudflare.Env, actor: ActorInfo, i
   if (!row) return
   if (row.owner_user_id !== actor.id || row.kind !== 'avatar' || row.bucket !== 'public') throw notFound('Photo')
   const entry = auditor.claim({ action: 'media.delete', targetType: 'media', targetId: id, before: { key: row.r2_key }, after: { status: 'deleted' } })
-  await retireAvatar(env, row, entry)
+  await retirePublicMedia(env, row, entry)
 }

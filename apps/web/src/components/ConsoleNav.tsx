@@ -21,8 +21,7 @@ interface ConsoleLink {
 const CONSOLE_LINKS: ConsoleLink[] = [
   { to: '/app', label: 'Dashboard' },
   { to: '/app/pages', label: 'My pages' },
-  { to: '/app/analytics', label: 'Analytics' },
-  { to: '/app/settings', label: 'Settings' },
+  { to: '/app/editor', label: 'Editor' },
 ]
 
 function Links({ className }: { className?: string }) {

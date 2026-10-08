@@ -2,7 +2,8 @@ import { app } from './app'
 import { now } from './lib/clock'
 import { auditInsertStmt, pruneAuditLogs, standaloneEntry } from './services/audit.service'
 import { SETTING_KEYS, getNumberSetting } from './services/settings.service'
-import { cleanupAvatarMedia } from './services/media-maintenance.service'
+import { cleanupPrivateMedia, cleanupPublicMedia } from './services/media-maintenance.service'
+import { prunePageAnalytics } from './services/analytics.service'
 import { purgeTrashedPageLinks } from './services/page.service'
 
 // ============================================================================
@@ -20,8 +21,11 @@ export interface MaintenanceReport {
   suspensionsExpired: number
   sanctionsExpired: number
   auditRowsPruned: number
-  avatarAssetsRemoved: number
-  avatarCleanupFailed: number
+  analyticsRowsPruned: number
+  publicMediaAssetsRemoved: number
+  publicMediaCleanupFailed: number
+  privateEvidenceAssetsRemoved: number
+  privateEvidenceCleanupFailed: number
   linksPurged: number
 }
 
@@ -69,15 +73,21 @@ export async function runMaintenance(env: Cloudflare.Env): Promise<MaintenanceRe
 
   const retentionDays = await getNumberSetting(db, SETTING_KEYS.auditRetentionDays, 0)
   const auditRowsPruned = await pruneAuditLogs(db, retentionDays)
-  const avatarCleanup = await cleanupAvatarMedia(env, timestamp)
+  const analyticsRetentionDays = await getNumberSetting(db, SETTING_KEYS.analyticsRetentionDays, 400)
+  const analyticsRowsPruned = await prunePageAnalytics(db, analyticsRetentionDays, timestamp)
+  const mediaCleanup = await cleanupPublicMedia(env, timestamp)
+  const privateEvidenceCleanup = await cleanupPrivateMedia(env, timestamp)
   const linksPurged = await purgeTrashedPageLinks(db, timestamp)
 
   return {
     sanctionsExpired: results[0]?.meta.changes ?? 0,
     suspensionsExpired: results[1]?.meta.changes ?? 0,
     auditRowsPruned,
-    avatarAssetsRemoved: avatarCleanup.removed,
-    avatarCleanupFailed: avatarCleanup.failed,
+    analyticsRowsPruned,
+    publicMediaAssetsRemoved: mediaCleanup.removed,
+    publicMediaCleanupFailed: mediaCleanup.failed,
+    privateEvidenceAssetsRemoved: privateEvidenceCleanup.removed,
+    privateEvidenceCleanupFailed: privateEvidenceCleanup.failed,
     linksPurged,
   }
 }

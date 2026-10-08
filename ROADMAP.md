@@ -9,8 +9,9 @@ phase names the files it touches, the migration it adds, the tests that must cov
 and the criteria that say "done". Where something does not exist yet, this file says
 so plainly rather than assuming it.
 
-Verified against the working tree after R2.1 (2026-10-07). Release 1 is complete and
-the R2.1 teams API is implemented; the next API phase is R2.2 (custom domains).
+Verified against the working tree after R2.6 moderation APIs and R2.8 ops updates
+(2026-10-08). Release 1, R2.1 teams, R2.3 analytics, and the moderation API core are
+implemented. Custom domains, contact collection, and email are paused by request.
 
 ## How to read this
 
@@ -85,20 +86,20 @@ Migrations are `apps/api/migrations/0001_init.sql` (identity, sessions, moderati
 pages, links, revisions, slug reservations, media, reports/appeals/flags, audit,
 settings, email templates, rate limits), `0002_pages_theme_and_scheduling.sql`
 (page theme/layout/accent/branding, link `description`, `starts_at`/`ends_at`),
-`0003_profile_fields.sql`, `0004_link_groups_and_thumbnails.sql`, and
-`0005_page_drafts.sql`. They are additive-only; the initial schema and new tables are STRICT.
+`0003_profile_fields.sql`, `0004_link_groups_and_thumbnails.sql`,
+`0005_page_drafts.sql`, `0006_page_teams.sql`, `0007_page_analytics.sql`, and
+`0008_appeal_evidence.sql`. They are additive-only; the initial schema and new tables are STRICT.
 
-Tables with **no route or service touching them yet**: `reports`,
-`appeals`, `content_flags`, `report_actions`, `invitations` (staff-shaped only).
-`slug_reservations` is used, but only internally. R2.1 adds page-scoped
-`page_members` and `page_invitations`.
+Tables with **no route or service touching them yet**: `invitations` (staff-shaped only).
+`slug_reservations` is used internally. R2.1 adds page-scoped `page_members` and
+`page_invitations`.
 
 ### 1.4 Dead columns (verified, not assumed)
 
 | Column | Reality |
 | --- | --- |
-| `pages.view_count` | Declared in `0001` and in `types.ts`. **Never read or written anywhere.** |
-| `page_links.clicks` | Same — declared, never incremented. |
+| `pages.view_count` | Incremented by the anonymous, rate-limited R2.3 view event. |
+| `page_links.clicks` | Incremented by a validated R2.3 click event for a live link. |
 | `pages.content_revision` | ~~Never written. Stays at its default `1` forever.~~ **Resolved in R1.0:** `createPage` stamps `0` (never published), `publishPage` copies the revision it writes to `page_revisions` into the column, and `revisionOfPage()` reads `revision` back off the row. `latestRevision()` is now a cross-check, not the source. |
 
 Two behaviours worth stating exactly, because the plan depends on them:
@@ -285,8 +286,8 @@ Page-image upload support is available for the R1.5 thumbnail key field.
 | --- | --- |
 | **Schema** | no migration. Existing `media_assets` and `media_upload_user` (60/h, throttle) are used. |
 | **API** | Managed avatars: `POST /api/v1/media/avatar?kind=avatar`, owned `GET /media/avatar`, public `GET /media/files/avatars/:ownerId/:filename`, and owned `DELETE /media/avatar/:id`. Attach using `PATCH /auth/me { avatarKey, expectedAvatarKey }`. Existing generic `POST /media?kind=avatar|page_image`, `DELETE /media/:id`, and legacy public URLs remain available. Thumbnail UI remains planned. |
-| **Rules** | Owner-namespaced immutable keys; server validates WebP container, dimensions, and bytes. Atomically mark retired and clear a matching profile pointer, then delete R2 before deleting the row. Retired rows are recoverable; maintenance rechecks unattached candidates. |
-| **Tests** | `media.api.spec.ts`: reject oversized and unknown types, ownership enforcement, key namespacing (two users, same filename, distinct keys), `429` on the seeded throttle, delete clears object and row. |
+| **Rules** | Owner-namespaced immutable keys; server validates image bytes, dimensions, and types. Uploads persist a non-public D1 tombstone before R2, then activate the asset and audit it in one batch. Deletes atomically retire the row, clear a matching profile pointer and audit before removing R2. Tombstones stay hidden and maintenance retries public-media cleanup after 24 hours. |
+| **Tests** | `media.api.spec.ts`: reject oversized and unknown types, ownership enforcement, key namespacing (two users, same filename, distinct keys), `429` on the seeded throttle, delete clears object and row. `media.maintenance.spec.ts` and `avatar.api.spec.ts` cover D1 failure, failed R2 compensation, hidden tombstones and cleanup retry. |
 | **Exit** | An avatar uploads, attaches, serves and deletes; `PUBLIC_BUCKET` has stopped being an unused binding. |
 | **UI** 🎨 | In-browser crop and resize (**D4**). The API stops at "store exactly the bytes you were given". |
 
@@ -368,16 +369,38 @@ console screen, not after: `AppShell` and `Guards` need a nested `/app` layout f
 
 ### R1.9 — Release 1 hardening ✅
 
-- **Status (2026-10-07).** Complete. The local migration rehearsal and repeat-seed checks
-  are complete; all **286 API tests / 15 files** pass, as do workspace typecheck,
-  production build, and `git diff --check`. The local browser pass verified registration
+- **Status (2026-10-08).** Complete. The local migration rehearsal and repeat-seed checks
+  are complete; all **302 API tests / 17 files** pass, and API typecheck is clean. The
+  workspace typecheck, production build, and `git diff --check` passed on 2026-10-07. The
+  local browser pass verified registration
   and session, profile editing, avatar upload/attachment/public read, page address and
   link creation, draft autosave isolation, publishing, public rendering, and copying the
   reachable public URL. On the running Worker, reserved/taken slugs returned `409` and
   invalid page input returned `422`. The API suite verifies the remaining negative paths:
   each rate-limited write budget (`429`), impersonated writes (`403`), foreign resources
   (`404`), and maintenance-mode writes (`503`). No remote deployment or migration was run.
-- **Docs:** ~~fix `README.md`~~ **Done** — it now reports 286 tests / 15 files, lists the
+- **Media recovery follow-up (2026-10-08).** Generic public-media uploads persist a D1
+  tombstone before R2 writes; deletes retire in D1 before R2 deletion. Maintenance
+  retries old public-media tombstones, including page images. API typecheck and all 292
+  tests were rerun after this change.
+- **Analytics API (2026-10-08).** `POST /public/pages/:slug/events` writes only daily
+  aggregate views/clicks and the existing lifetime counters; `GET /pages/:id/analytics`
+  is owner-only. Event requests are IP-rate-limited without storing visitor identifiers.
+  Analytics history is pruned by daily maintenance using `analytics.retention_days`.
+- **Moderation API (2026-10-08).** Public page reports keep an immutable snapshot and
+  deduplicate repeats; staff can triage reports, review flags, remove/restore pages, and
+  decide appeals. Literal auto-flag terms are owner-configurable and disabled by default;
+  flags never apply sanctions automatically. Suspension/ban appeal endpoints accept only
+  the user's unexpired revoked cookie and only on appeal routes.
+- **Moderation evidence (2026-10-08).** Reports can target a page, visible link, or that
+  page's owner. Staff can upload/read report evidence; an appellant can upload evidence
+  to their own pending appeal. Objects use `PRIVATE_BUCKET`, are never public media URLs,
+  and aged failed-upload tombstones are retried by maintenance. Public report submitters
+  still cannot attach files directly.
+- **Ops follow-up (2026-10-08).** Wrangler logs and traces are enabled; API typecheck and
+  all **305 tests / 17 files** pass. D1 backup policy and alert destinations still require
+  Cloudflare account configuration.
+- **Docs:** ~~fix `README.md`~~ **Done** — it now reports 305 tests / 17 files, lists the
   `/pages` and `/profile` routes, and points at this file. Keep it current as screens land.
 - **End to end:** ~~one scripted pass against `wrangler dev` — signup → profile → avatar →
   address → links → autosave → publish → public page → share~~ **Done** (local browser
@@ -415,13 +438,13 @@ DTOs include `accessRole`.
 | # | Item | Why it cannot come earlier |
 | --- | --- | --- |
 | R2.1 ✅ | **Teams & collaboration** — `page_members`, per-page roles, invites | Implemented above using R1.0's page-access seam. |
-| R2.2 | **Custom domains** — `domains`, DNS verification, TLS | A user domain must serve **public pages only**, never auth or the console (`__Host-` cookies cannot be scoped to it). `pages_base_url` becomes per-page instead of global. |
-| R2.3 | **Analytics** — view/click events, `POST /public/pages/:slug/events`, dashboards | Needs R1.7's pure public read as the anchor, and finally gives `view_count` and `page_links.clicks` writers. |
-| R2.4 | **Contact collection** — form blocks, submissions, spam control | Needs the draft envelope's `v` field from R1.6, or adding a block type invalidates every stored revision. |
-| R2.5 | **Email** — provider wiring, template rendering, delivery log | `email.service.ts` is a stub and the 8 seeded templates have no renderer. Independent of Release 1, and nothing in Release 1 waits on it. |
-| R2.6 | **Moderation engine** — auto-flag rules, report queue, appeals flow | The tables exist; the rules and the queue do not. Only meaningful once there is traffic to moderate. |
+| R2.2 ⏸ | **Custom domains** — `domains`, DNS verification, TLS | Paused by request. A user domain must serve **public pages only**, never auth or the console (`__Host-` cookies cannot be scoped to it). |
+| R2.3 ✅ API | **Analytics** — view/click events and owner reports | Implemented aggregate `POST /public/pages/:slug/events` and owner-only `GET /pages/:id/analytics`; analytics UI dashboards remain. |
+| R2.4 ⏸ | **Contact collection** — form blocks, submissions, spam control | Paused by request. |
+| R2.5 ⏸ | **Email** — provider wiring, template rendering, delivery log | Paused by request. |
+| R2.6 ✅ API | **Moderation engine** — reports, review flags, appeals, page moderation | Reports target pages, links, or page owners; private staff/appellant evidence uses `PRIVATE_BUCKET`. Public reporters cannot yet attach files. |
 | R2.7 | **Admin console (SPA)** — settings editor, user tools, audit viewer | The APIs exist and are tested; only the screens are missing. Kept out of Release 1 on purpose: Release 1 is the *owner* loop. |
-| R2.8 | **Ops** — backups, retention jobs, observability, alerting | Needs a stable shape to monitor. |
+| R2.8 🔨 | **Ops** — backups, retention jobs, observability, alerting | Analytics retention and Worker traces are implemented; backup policies and alert destinations need account setup. |
 
 **Explicitly not planned:** billing, multi-tenant organisations, per-page custom CSS/JS
 (a stored-XSS foot-gun on a single origin, and the reason `showBranding` exists instead),
