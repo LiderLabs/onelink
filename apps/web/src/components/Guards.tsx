@@ -27,6 +27,19 @@ export function safeNext(raw: string | null): string | null {
 }
 
 /** Everything a signed-in session is required for. */
+
+/**
+ * The profile screen is the one console surface a restricted session may reach.
+ *
+ * Editing used to live on the dashboard (`/app`), so that is where the interlock
+ * sent a session that must change its password, or is pending/suspended, or is
+ * being impersonated. The dashboard is now a read-only overview and the profile
+ * plus its security section moved into the merged editor, so this is the address
+ * that carries the forced-password form, the impersonation notice and the
+ * account explanation. Restricted sessions are routed here and nowhere else.
+ */
+const PROFILE_EDITOR_PATH = '/app/editor/profile'
+
 export function RequireAuth() {
   const session = useSession()
   const location = useLocation()
@@ -37,17 +50,12 @@ export function RequireAuth() {
     const next = encodeURIComponent(`${location.pathname}${location.search}`)
     return <Navigate to={`/login?next=${next}`} replace />
   }
-  if (session.mustChangePassword && location.pathname !== '/app') {
-    return <Navigate to="/app" replace />
-  }
-  if (session.user.status !== 'active' && location.pathname !== '/app') {
-    return <Navigate to="/app" replace />
-  }
-  if (
-    session.user.impersonatedBy !== null &&
-    location.pathname !== '/app'
-  ) {
-    return <Navigate to="/app" replace />
+  const restricted =
+    session.mustChangePassword ||
+    session.user.status !== 'active' ||
+    session.user.impersonatedBy !== null
+  if (restricted && location.pathname !== PROFILE_EDITOR_PATH) {
+    return <Navigate to={PROFILE_EDITOR_PATH} replace />
   }
 
   return <Outlet />

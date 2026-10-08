@@ -4,7 +4,7 @@ import { accountDisabled, forbidden, passwordChangeRequired, unauthenticated } f
 import { readSessionToken } from '../lib/http'
 import { isMutationMethod } from './audit'
 import { authorize, type Capability } from '../lib/rbac'
-import { resolveSession, touchSession } from '../services/auth.service'
+import { resolveSanctionAppealSession, resolveSession, touchSession } from '../services/auth.service'
 import type { AppEnv, AuthUser } from '../types'
 
 // ============================================================================
@@ -89,6 +89,23 @@ export const requireUnimpersonated = createMiddleware<AppEnv>(async (c, next) =>
   if (user.impersonatedBy !== null && isMutationMethod(c.req.method)) {
     throw forbidden('Impersonation sessions are read-only.')
   }
+  await next()
+})
+
+/** Allows a revoked suspension/ban cookie to reach only the appeal API. */
+export const requireAppealSession = createMiddleware<AppEnv>(async (c, next) => {
+  let user = c.get('user')
+  if (!user) {
+    const token = readSessionToken(c)
+    if (!token) throw unauthenticated()
+    const resolved = await resolveSanctionAppealSession(c.env.DB, appConfig(c.env), token)
+    if (!resolved) throw unauthenticated()
+    user = resolved.user
+    c.set('user', resolved.user)
+    c.set('session', resolved.session)
+  }
+  if (user.impersonatedBy !== null) throw forbidden('Impersonation sessions cannot access appeals.')
+  if (user.status === 'deleted' || user.status === 'pending') throw accountDisabled('This account cannot access appeals.')
   await next()
 })
 

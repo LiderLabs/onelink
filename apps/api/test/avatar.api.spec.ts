@@ -3,7 +3,7 @@ import { env } from 'cloudflare:workers'
 import { avatarWebp } from './fixtures/media'
 import { api, rawApi, createTestUser, loginAs, impersonatedCookieFor, resetIsolateCaches, type Envelope, type ErrorEnvelope } from './helpers'
 import { uploadAvatar, deleteOwnedAvatar } from '../src/services/avatar.service'
-import { cleanupAvatarMedia } from '../src/services/media-maintenance.service'
+import { cleanupPublicMedia } from '../src/services/media-maintenance.service'
 import { updateOwnProfile } from '../src/services/user.service'
 import { standaloneEntry } from '../src/services/audit.service'
 import type { Auditor, MediaDto } from '../src/types'
@@ -105,7 +105,7 @@ describe('avatar upload and public serving', () => {
       expect(log).toHaveBeenCalledWith(expect.stringContaining('media-test-request'))
     }finally{log.mockRestore()}
     expect(deferredKey).not.toBeNull()
-    expect(await cleanupAvatarMedia(env)).toMatchObject({ removed: 1, failed: 0 })
+    expect(await cleanupPublicMedia(env,Date.now()+86400001)).toMatchObject({ removed: 1, failed: 0 })
     expect(await env.PUBLIC_BUCKET.get(deferredKey!)).toBeNull()
   })
 })

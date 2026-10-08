@@ -1,4 +1,6 @@
 import type { CSSProperties } from 'react'
+import { SocialIcon } from '../../components/SocialIcon'
+import { platformLabel } from '../profile/social-platforms'
 import type { PageLink, PageLayout, PageTheme, PublicPageOwner } from '../../lib/types'
 
 export interface PageRenderModel {
@@ -57,13 +59,25 @@ export function PageRenderer({ page }: { page: PageRenderModel }) {
             <nav aria-label={`${page.owner.displayName} social links`} className="mt-5 flex flex-wrap justify-center gap-x-4 gap-y-2">
               {page.owner.socials.map((social) => {
                 const href = safeHttpUrl(social.url)
+                // The wire value (`ko-fi`, `x`) is a key, not a name: it reads as
+                // `ko-fi` in lowercase wherever it leaked onto the page. The label
+                // is what a visitor should see, and the mark is drawn beside it.
+                const label = platformLabel(social.platform)
+                // The glyph is decorative — the visible label carries the name — so
+                // `labelled` stays off and the svg is `aria-hidden`.
+                const content = (
+                  <>
+                    <SocialIcon platform={social.platform} label={label} size={16} />
+                    <span>{label}</span>
+                  </>
+                )
                 return href ? (
-                  <a key={`${social.platform}-${social.url}`} href={href} rel="noopener noreferrer" className={`text-xs underline underline-offset-4 ${dark ? 'text-white/70' : 'text-black/65'}`}>
-                    {social.platform}
+                  <a key={`${social.platform}-${social.url}`} href={href} rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 text-xs underline underline-offset-4 ${dark ? 'text-white/70' : 'text-black/65'}`}>
+                    {content}
                   </a>
                 ) : (
-                  <span key={`${social.platform}-${social.url}`} className={`text-xs ${dark ? 'text-white/50' : 'text-black/45'}`}>
-                    {social.platform}
+                  <span key={`${social.platform}-${social.url}`} className={`inline-flex items-center gap-1.5 text-xs ${dark ? 'text-white/50' : 'text-black/45'}`}>
+                    {content}
                   </span>
                 )
               })}

@@ -187,6 +187,7 @@ export const SETTING_KEYS = {
   maintenanceMode: 'platform.maintenance_mode',
   maintenanceMessage: 'platform.maintenance_message',
   autoFlagEnabled: 'moderation.auto_flag_enabled',
+  autoFlagKeywords: 'moderation.auto_flag_keywords',
   requireReason: 'moderation.require_reason',
   reportCooldownMinutes: 'moderation.report_cooldown_minutes',
   maxLinksPerPage: 'content.max_links_per_page',
@@ -196,6 +197,7 @@ export const SETTING_KEYS = {
   maxAppealAttempts: 'appeals.max_attempts',
   appealWindowDays: 'appeals.window_days',
   auditRetentionDays: 'audit.retention_days',
+  analyticsRetentionDays: 'analytics.retention_days',
 } as const
 
 // ---------------------------------------------------------------- reading ---

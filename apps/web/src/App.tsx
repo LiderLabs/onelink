@@ -10,11 +10,16 @@ import { NotFoundRoute } from './routes/not-found'
 import { RegisterRoute } from './routes/register'
 import { ResetPasswordRoute } from './routes/reset-password'
 import { PageCreateRoute } from './features/pages/PageCreateRoute'
-import { PageEditorRoute } from './features/pages/PageEditorRoute'
 import { PageListRoute } from './features/pages/PageListRoute'
 import { DashboardRoute } from './features/console/DashboardRoute'
-import { AnalyticsRoute, SettingsRoute, SubmissionsRoute } from './features/console/R2Routes'
-import { Navigate } from 'react-router-dom'
+import { SubmissionsRoute } from './features/console/R2Routes'
+import { EditorLayout } from './features/editor/EditorLayout'
+import { ProfileTab } from './features/editor/ProfileTab'
+import { LinksTab } from './features/editor/LinksTab'
+import { DesignTab } from './features/editor/DesignTab'
+import { AnalyticsTab } from './features/editor/AnalyticsTab'
+import { SettingsTab } from './features/editor/SettingsTab'
+import { Navigate, useLocation, useParams } from 'react-router-dom'
 import type { RouteObject } from 'react-router-dom'
 
 // ============================================================================
@@ -38,6 +43,30 @@ import type { RouteObject } from 'react-router-dom'
 // keeps `/app/typo` from falling through to a slug lookup — the fall-through the
 // spec calls out in §3.
 // ============================================================================
+
+// ---------------------------------------------------------------------------
+// Compatibility redirects.
+//
+// The console used to edit in place on the dashboard (`/app#profile-editor`) and
+// on a separate page-editor screen (`/app/pages/:id`). Editing now lives on the
+// merged editor tabs, so the old addresses forward there — bookmarks and links
+// keep working, and a hash deep-link (`#links-heading`) still lands on the right
+// tab rather than the top of the editor.
+// ---------------------------------------------------------------------------
+
+function DashboardIndex() {
+  const { hash } = useLocation()
+  if (hash === '#profile-editor' || hash === '#socials') return <Navigate to="/app/editor/profile" replace />
+  return <DashboardRoute />
+}
+
+function PageEditorRedirect() {
+  const { id } = useParams()
+  const { hash } = useLocation()
+  const tab = hash === '#appearance-heading' ? 'design' : hash === '#page-address' ? 'settings' : 'links'
+  const search = id ? `?page=${encodeURIComponent(id)}` : ''
+  return <Navigate to={`/app/editor/${tab}${search}`} replace />
+}
 
 export const routes: RouteObject[] = [
   {
@@ -63,18 +92,33 @@ export const routes: RouteObject[] = [
         element: <RequireAuth />,
         children: [
           {
+            // The merged editor is full-width and owns its own chrome, so it opts
+            // out of the console rail entirely rather than nesting inside it.
+            path: 'editor',
+            element: <EditorLayout />,
+            children: [
+              { index: true, element: <Navigate to="/app/editor/profile" replace /> },
+              { path: 'profile', element: <ProfileTab /> },
+              { path: 'links', element: <LinksTab /> },
+              { path: 'design', element: <DesignTab /> },
+              { path: 'analytics', element: <AnalyticsTab /> },
+              { path: 'settings', element: <SettingsTab /> },
+              { path: '*', element: <ConsoleNotFoundRoute /> },
+            ],
+          },
+          {
             element: <ConsoleLayout />,
             children: [
-              { index: true, element: <DashboardRoute /> },
-              // Older account URLs remain aliases; editing now lives on Dashboard.
-              { path: 'profile', element: <Navigate to="/app#profile-editor" replace /> },
-              { path: 'socials', element: <Navigate to="/app#socials" replace /> },
-              { path: 'analytics', element: <AnalyticsRoute /> },
-              { path: 'settings', element: <SettingsRoute /> },
+              { index: true, element: <DashboardIndex /> },
+              // Retired addresses forward to the merged editor tabs.
+              { path: 'profile', element: <Navigate to="/app/editor/profile" replace /> },
+              { path: 'socials', element: <Navigate to="/app/editor/profile" replace /> },
+              { path: 'analytics', element: <Navigate to="/app/editor/analytics" replace /> },
+              { path: 'settings', element: <Navigate to="/app/editor/settings" replace /> },
               { path: 'submissions', element: <SubmissionsRoute /> },
               { path: 'pages', element: <PageListRoute /> },
               { path: 'pages/new', element: <PageCreateRoute /> },
-              { path: 'pages/:id', element: <PageEditorRoute /> },
+              { path: 'pages/:id', element: <PageEditorRedirect /> },
               { path: '*', element: <ConsoleNotFoundRoute /> },
             ],
           },
@@ -84,7 +128,7 @@ export const routes: RouteObject[] = [
       // Kept for bookmarks: `/profile` was the account screen before the console
       // namespace existed. A `profile` slug is still served at `/p/profile`, so
       // this alias costs one public address, not every one of them.
-      { path: '/profile', element: <Navigate to="/app#profile-editor" replace /> },
+      { path: '/profile', element: <Navigate to="/app/editor/profile" replace /> },
       { path: '/', element: <Navigate to="/app" replace /> },
       { path: '*', element: <NotFoundRoute /> },
     ],

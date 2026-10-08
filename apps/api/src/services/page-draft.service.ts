@@ -12,7 +12,7 @@ import { PAGE_IMAGE_KEY_PATTERN } from '../lib/media'
 import { placeholders } from '../lib/query'
 import { auditInsertStmt } from './audit.service'
 import { toApiPage } from './mappers'
-import { getNumberSetting, SETTING_KEYS } from './settings.service'
+import { getBooleanSetting, getNumberSetting, getSetting, SETTING_KEYS } from './settings.service'
 import type {
   ActorInfo,
   Auditor,
@@ -481,6 +481,22 @@ export async function publishDraft(
   })
   const groups = content.groups.map((group) => ({ ...group }))
   const links = content.links.map((link) => ({ ...link, domain: hostnameOf(link.url) }))
+  const flagValue = await getSetting<unknown>(db, SETTING_KEYS.autoFlagKeywords, [])
+  const autoFlagKeywords = Array.isArray(flagValue)
+    ? [...new Set(flagValue.filter((value): value is string => typeof value === 'string')
+        .map((value) => value.trim().toLowerCase()).filter((value) => value.length >= 2 && value.length <= 80))].slice(0, 100)
+    : []
+  const autoFlagsEnabled = await getBooleanSetting(db, SETTING_KEYS.autoFlagEnabled, false)
+  const publishText = [content.page.title, content.page.bio,
+    ...content.links.flatMap((link) => [link.title, link.description ?? '', link.url]),
+    ...content.groups.map((group) => group.name)]
+    .join('\n').toLowerCase()
+  const matchedKeywords = autoFlagsEnabled ? autoFlagKeywords.filter((keyword) => publishText.includes(keyword)) : []
+  const existingAutoFlags = matchedKeywords.length > 0
+    ? await db.prepare(`SELECT rule FROM content_flags WHERE page_id=? AND source='auto' AND status='open'`)
+      .bind(target.id).all<{ rule: string | null }>()
+    : { results: [] as { rule: string | null }[] }
+  const alreadyFlagged = new Set(existingAutoFlags.results.map((row) => row.rule))
 
   const statements: D1PreparedStatement[] = [
     db.prepare(
@@ -534,6 +550,14 @@ export async function publishDraft(
          updated_at = excluded.updated_at, deleted_at = NULL
        WHERE page_links.page_id = excluded.page_id`,
     ).bind(target.id, timestamp, timestamp, JSON.stringify(links), ...draftGuardBinds))
+  }
+
+  for (const keyword of matchedKeywords) {
+    if (alreadyFlagged.has(keyword)) continue
+    statements.push(db.prepare(`INSERT INTO content_flags(
+      id,target_type,target_id,page_id,source,rule,matched_text,severity,status,created_at
+    ) VALUES(?,'page',?,?,'auto',?,?,2,'open',?)`)
+      .bind(ulid(), target.id, target.id, keyword, keyword, timestamp))
   }
 
   statements.push(

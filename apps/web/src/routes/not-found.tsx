@@ -20,7 +20,7 @@ export function NotFoundRoute() {
       folio="—"
       footer={
         <Link
-          to="/app#profile-editor"
+          to="/app/editor/profile"
           className="border-b border-transparent font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-ink-soft transition-colors hover:border-ink hover:text-ink"
         >
           Go to your account

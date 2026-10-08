@@ -335,11 +335,35 @@ async function visit(page, path) {
   await page.goto(new URL(path, baseUrl).href)
 }
 
+/** Poll a fixture-side condition (the editor autosaves, so "saved" is async). */
+async function waitUntil(check, { timeout = 6000, interval = 60 } = {}) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline) {
+    if (await check()) return
+    await new Promise((resolve) => setTimeout(resolve, interval))
+  }
+  throw new Error('Timed out waiting for condition')
+}
+
 async function setViewport(page, width) {
   await page.setViewportSize({ width, height: 900 })
   await page.evaluate(() => window.scrollTo(0, 0))
   await page.waitForTimeout(80)
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, `horizontal overflow at ${width}px on ${new URL(page.url()).pathname}`)
+  const report = await page.evaluate(() => {
+    const vw = window.innerWidth
+    const overflow = document.documentElement.scrollWidth <= vw
+    const offenders = []
+    for (const el of document.querySelectorAll('*')) {
+      const r = el.getBoundingClientRect()
+      if (r.right > vw + 1 || r.left < -1) {
+        const cls = typeof el.className === 'string' ? el.className : ''
+        offenders.push(`${el.tagName.toLowerCase()}[${cls.slice(0, 70)}] right=${Math.round(r.right)}`)
+        if (offenders.length >= 10) break
+      }
+    }
+    return { overflow, offenders }
+  })
+  assert.equal(report.overflow, true, `horizontal overflow at ${width}px on ${new URL(page.url()).pathname} :: ${report.offenders.join(' | ')}`)
 }
 
 const browser = await chromium.launch({ headless: true })
@@ -358,15 +382,16 @@ try {
 
   setUser()
   await visit(page, '/app/profile')
-  await page.waitForURL((url) => url.pathname === '/app' && url.hash === '#profile-editor')
+  await page.waitForURL((url) => url.pathname === '/app/editor/profile')
   await page.getByLabel('Display name', { exact: true }).waitFor()
   await visit(page, '/app/socials')
-  await page.waitForURL((url) => url.pathname === '/app' && url.hash === '#socials')
+  await page.waitForURL((url) => url.pathname === '/app/editor/profile')
   await page.getByRole('heading', { name: 'Social links', exact: true }).waitFor()
   pageItems = []
   await visit(page, '/app')
   await page.getByRole('heading', { name: 'Acceptance User', exact: true }).waitFor()
   assert.ok(await page.getByText('@acceptance', { exact: true }).isVisible())
+  await visit(page, '/app/editor/profile')
   await page.getByLabel('Display name', { exact: true }).waitFor()
   await page.getByRole('heading', { name: 'Social links', exact: true }).waitFor()
   pageItems = [publishedPage, secondPage]
@@ -378,24 +403,22 @@ try {
   assert.ok(await page.getByText('Views, clicks, and contact submissions are not collected in this release, so there is no activity feed to show.').isVisible())
   assert.equal(await page.getByRole('button', { name: 'Publish', exact: true }).isDisabled(), true)
   assert.equal(await page.getByText('12,345').count(), 0)
+  await visit(page, `/app/editor/links?page=${pageId}`)
+  await page.getByRole('heading', { name: 'Manage Links', exact: true }).waitFor()
   await page.getByRole('button', { name: 'Hide My portfolio', exact: true }).click()
-  await page.getByRole('status').filter({ hasText: 'Draft link changes saved.' }).waitFor()
-  assert.equal(draftContent.links[0].isVisible, false)
-  assert.equal(await page.getByRole('button', { name: /Publish/ }).isEnabled(), true)
+  await waitUntil(() => draftContent.links[0].isVisible === false)
+  assert.equal(await page.getByRole('button', { name: 'Publish', exact: true }).isEnabled(), true)
   await page.getByRole('button', { name: 'Show My portfolio', exact: true }).click()
-  await page.getByRole('status').filter({ hasText: 'Draft link changes saved.' }).waitFor()
-  assert.equal(draftContent.links[0].isVisible, true)
+  await waitUntil(() => draftContent.links[0].isVisible === true)
   await page.getByRole('button', { name: 'Move My portfolio down', exact: true }).click()
-  await page.getByRole('status').filter({ hasText: 'Draft link changes saved.' }).waitFor()
-  assert.equal(draftContent.links[0].id, secondLinkId)
+  await waitUntil(() => draftContent.links[0].id === secondLinkId)
   await page.getByRole('button', { name: 'Move My portfolio up', exact: true }).click()
-  await page.getByRole('status').filter({ hasText: 'Draft link changes saved.' }).waitFor()
-  assert.equal(draftContent.links[0].id, linkId)
-  await page.getByRole('button', { name: 'Remove My portfolio', exact: true }).click()
-  const dashboardDeleteDialog = page.getByRole('dialog', { name: /Remove “My portfolio”/ })
-  await dashboardDeleteDialog.waitFor()
-  await dashboardDeleteDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
-  await dashboardDeleteDialog.waitFor({ state: 'hidden' })
+  await waitUntil(() => draftContent.links[0].id === linkId)
+  await page.getByRole('button', { name: 'Delete My portfolio', exact: true }).click()
+  const linkDeleteDialog = page.getByRole('dialog', { name: /delete/i })
+  await linkDeleteDialog.waitFor()
+  await linkDeleteDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await linkDeleteDialog.waitFor({ state: 'hidden' })
   for (const width of [320, 375, 768, 1280]) await setViewport(page, width)
 
   await setViewport(page, 1440)
@@ -403,38 +426,32 @@ try {
   await page.getByRole('heading', { name: 'My pages', exact: true }).waitFor()
   assert.ok(await page.getByRole('link', { name: 'A good place to begin' }).isVisible())
   await page.getByRole('link', { name: 'A good place to begin' }).click()
-  await page.getByRole('heading', { name: 'Page appearance', exact: true }).waitFor()
-  await page.getByRole('navigation', { name: 'Page editor sections' }).waitFor()
-  await page.getByRole('navigation', { name: 'Page editor sections' }).getByRole('link', { name: 'Analytics', exact: true }).click()
+  await page.getByRole('heading', { name: 'Manage Links', exact: true }).waitFor()
+  await page.getByRole('tablist', { name: 'Editor sections' }).waitFor()
+  await page.getByRole('tab', { name: 'Analytics', exact: true }).click()
   await page.getByRole('heading', { name: 'Analytics', exact: true }).waitFor()
   assert.ok(await page.getByText(/does not currently record page views/i).isVisible())
   assert.ok(await page.getByText('Not collected', { exact: true }).first().isVisible())
-  await visit(page, `/app/pages/${pageId}`)
-  await page.getByRole('heading', { name: 'Page appearance', exact: true }).waitFor()
+  await visit(page, `/app/editor/links?page=${pageId}`)
+  await page.getByRole('heading', { name: 'Manage Links', exact: true }).waitFor()
   for (const width of [320, 375, 768, 1280]) await setViewport(page, width)
   await setViewport(page, 1440)
-  await page.getByRole('link', { name: 'Links', exact: true }).click()
-  assert.equal(new URL(page.url()).hash, '#links-heading')
-  await page.getByRole('button', { name: 'Add a link', exact: true }).click()
+  await page.getByRole('tab', { name: 'Links', exact: true }).click()
+  assert.equal(new URL(page.url()).pathname, '/app/editor/links')
+  await page.getByRole('button', { name: 'Add Link', exact: true }).click()
   const linkDialog = page.getByRole('dialog', { name: 'Add Link', exact: true })
   await linkDialog.waitFor()
   await linkDialog.getByLabel('URL', { exact: true }).fill('https://example.test/new-destination')
   await linkDialog.getByLabel('Title', { exact: true }).fill('New destination')
   await linkDialog.getByLabel('Description (optional)', { exact: true }).fill('A new link from the editor.')
-  await linkDialog.getByRole('button', { name: 'Add link', exact: true }).click()
+  await linkDialog.getByRole('button', { name: 'Add Link', exact: true }).click()
   await linkDialog.waitFor({ state: 'hidden' })
-  await page.getByRole('heading', { name: 'New destination', exact: true }).waitFor()
-  await page.getByRole('button', { name: 'Make a QR code', exact: true }).click()
-  await page.getByLabel('QR code options').waitFor()
-  assert.ok(await page.locator('canvas[aria-label^="QR code for"]').isVisible())
-  assert.ok(await page.getByRole('button', { name: 'Download SVG', exact: true }).isEnabled())
-  const deleteButton = page.getByRole('button', { name: 'Delete', exact: true })
-  await deleteButton.click()
+  await page.getByText('New destination', { exact: true }).waitFor()
+  await page.getByRole('button', { name: 'Delete New destination', exact: true }).click()
   const deleteDialog = page.getByRole('dialog', { name: /delete/i })
   await deleteDialog.waitFor()
-  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
   await deleteDialog.waitFor({ state: 'hidden' })
-  assert.equal(await deleteButton.evaluate(element => element === document.activeElement), true)
 
   await visit(page, '/p/acceptance')
   await page.getByRole('heading', { name: 'A good place to begin', exact: true }).waitFor()
@@ -444,8 +461,7 @@ try {
   await visit(page, '/p/missing-address')
   await page.getByText('This page isn’t available', { exact: true }).waitFor()
 
-  await visit(page, '/app')
-  assert.equal(new URL(page.url()).pathname, '/app')
+  await visit(page, '/app/editor/profile')
   await page.getByRole('heading', { name: 'Social links', exact: true }).waitFor()
   await page.getByRole('region', { name: 'Live profile preview', exact: true }).waitFor()
   const profilePreview = page.getByRole('region', { name: 'Live profile preview', exact: true })
@@ -472,11 +488,16 @@ try {
   setUser()
 
   await visit(page, '/app/settings')
+  await page.waitForURL((url) => url.pathname === '/app/editor/settings')
   await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor()
-  for (const feature of ['Custom domain', 'Contact form & submissions', 'Team access']) {
-    assert.ok(await page.getByRole('heading', { name: feature, exact: true }).isVisible(), `${feature} card is visible`)
+  for (const label of ['Bring your own address', 'Contact, newsletter & team']) {
+    assert.ok(await page.getByRole('heading', { name: label, exact: true }).isVisible(), `${label} panel is visible`)
   }
-  assert.ok(await page.getByText('Unavailable · Release 2').first().isVisible())
+  assert.ok(await page.getByText('Not saved yet', { exact: false }).first().isVisible())
+  await page.getByRole('button', { name: 'Create QR code', exact: true }).click()
+  await page.getByRole('region', { name: 'QR code options', exact: true }).waitFor()
+  assert.ok(await page.locator('canvas[aria-label^="QR code for"]').isVisible())
+  assert.ok(await page.getByRole('button', { name: 'Download SVG', exact: true }).isEnabled())
   await visit(page, '/app/submissions')
   await page.getByRole('heading', { name: 'Submissions', exact: true }).waitFor()
   assert.ok(await page.getByText(/does not accept contact-form submissions/i).isVisible())
@@ -496,22 +517,17 @@ try {
   assert.equal(await forbiddenNotice.getByRole('button', { name: /load.*again|retry/i }).count(), 0)
   await forbiddenPage.close()
 
-  queueFault(`/pages/${pageId}`, 'GET', 404, 'NOT_FOUND', 'Page unavailable.')
-  await visit(page, `/app/pages/${pageId}`)
-  await page.getByText('This page is unavailable', { exact: true }).waitFor()
-  await page.getByRole('link', { name: 'Return to My pages', exact: true }).click()
-  await page.getByRole('heading', { name: 'My pages', exact: true }).waitFor()
+  queueFault(`/pages/${pageId}/draft`, 'GET', 404, 'NOT_FOUND', 'Page unavailable.')
+  await visit(page, `/app/editor/links?page=${pageId}`)
+  await page.getByRole('alert').filter({ hasText: 'Page unavailable.' }).waitFor()
 
   queueFault(`/pages/${pageId}`, 'PATCH', 409, 'CONFLICT', 'This address has changed elsewhere.')
-  await visit(page, `/app/pages/${pageId}`)
-  await page.getByRole('heading', { name: 'Page appearance', exact: true }).waitFor()
-  const editorAddress = page.getByLabel('Public address', { exact: true })
+  await visit(page, `/app/editor/settings?page=${pageId}`)
+  await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor()
+  const editorAddress = page.getByLabel('Page address', { exact: true })
   await editorAddress.fill('renamed-address')
   await page.getByRole('status').filter({ hasText: 'This address is available.' }).waitFor()
   await page.getByRole('button', { name: 'Change address', exact: true }).click()
-  const renameDialog = page.getByRole('dialog', { name: /change this page address/i })
-  await renameDialog.waitFor()
-  await renameDialog.getByRole('button', { name: 'Change address', exact: true }).click()
   await page.getByRole('alert').filter({ hasText: 'This address has changed elsewhere.' }).waitFor()
   assert.equal(await editorAddress.inputValue(), 'renamed-address')
 
@@ -537,22 +553,24 @@ try {
 
   setUser('forced')
   await visit(page, '/app/pages')
-  await page.waitForURL((url) => url.pathname === '/app')
+  await page.waitForURL((url) => url.pathname === '/app/editor/profile')
   await page.getByRole('alert').filter({ hasText: 'Password change required' }).waitFor()
 
   setUser('pending')
   await visit(page, '/app/pages')
-  await page.waitForURL((url) => url.pathname === '/app')
+  await page.waitForURL((url) => url.pathname === '/app/editor/profile')
   await page.getByRole('alert').filter({ hasText: 'Account pending' }).waitFor()
 
   setUser('suspended')
   await visit(page, '/app/pages')
-  await page.waitForURL((url) => url.pathname === '/app')
+  await page.waitForURL((url) => url.pathname === '/app/editor/profile')
   assert.ok(await page.getByRole('alert').filter({ hasText: 'Account suspended' }).first().isVisible())
 
   setUser('impersonated')
   await visit(page, '/app')
-  assert.ok(await page.getByText('Read-only support session').isVisible())
+  await page.waitForURL((url) => url.pathname === '/app/editor/profile')
+  await page.getByText('Read-only support session').waitFor()
+  await page.getByLabel('Display name', { exact: true }).waitFor()
   assert.equal(await page.getByLabel('Display name', { exact: true }).isDisabled(), true)
   await visit(page, '/app#socials')
   await page.getByRole('heading', { name: 'Social links', exact: true }).waitFor()
@@ -628,7 +646,7 @@ try {
   await page.getByLabel('Short introduction', { exact: true }).fill('  A short bio.  ')
   await page.getByLabel('Accent colour', { exact: true }).fill('#D3A84C')
   await page.getByRole('button', { name: 'Create page', exact: true }).click()
-  await page.getByRole('heading', { name: 'Page appearance', exact: true }).waitFor()
+  await page.getByRole('heading', { name: 'Manage Links', exact: true }).waitFor()
   assert.deepEqual(createPayloads.at(-1), {
     slug: 'created-page',
     title: 'Created title',

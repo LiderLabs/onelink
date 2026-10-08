@@ -19,6 +19,18 @@ continued in `ROADMAP.md`. §0.1 and §0.2 are the summary; §4 and §7 keep the
 every phase in §7 also carries its own status marker. If you are picking this up, read
 §0.1–§0.4, then §3 (the rules), then §7's entry for the phase you are taking.*
 
+> **Reconciled 2026-10-07 — the console's route family moved.** Editing now happens on
+> one merged, full-width editor at `/app/editor/<tab>`, where `<tab>` is `profile`,
+> `links`, `design`, `analytics` or `settings`. The dashboard no longer edits in place
+> (`/app#profile-editor`, `/app#socials`) and there is no separate `/app/pages/:id`
+> editor screen any more. Every older address survives as a compatibility redirect:
+> `/app#profile-editor`, `/app#socials`, `/app/profile`, `/app/socials`,
+> `/app/analytics`, `/app/settings` and `/app/pages/:id` (which carries `?page=<id>` and
+> forwards to the tab named by its `#hash`) all land on the matching editor tab, and
+> `/profile` lands on the profile tab. `/app/pages` and `/app/pages/new` are unchanged.
+> Where the phase entries below name `/app/pages/:id` or `/app#profile-editor`, read them
+> as that phase's historical target rather than a live route.
+
 ### 0.1 Built — U0 + U1 ✅
 
 One change set, committed as `feat(web): console namespace (U0) and profile screen (U1)`,
@@ -69,7 +81,7 @@ apps/web/src/
 | --- | --- |
 | `npm run typecheck` (worker types + both workspaces) | clean |
 | `npm --workspace apps/web run build` (`tsc --noEmit && vite build`) | clean |
-| `npm test` — the API suites, i.e. the UI's contract evidence | **286 passing / 15 files** |
+| `npm test` — the API suites, i.e. the UI's contract evidence | **290 passing / 16 files** |
 | `npm run browser:acceptance` | **passing**; fixture-driven route, session, failure-state, keyboard, reduced-motion, and responsive checks |
 | Session, error, accessibility and dirty-form matrices | **partial**; see §9 for proven cases and remaining gaps |
 
@@ -102,7 +114,7 @@ group filters, hidden links, visibility controls, and metadata suggestions.
 | Phase | Produces | Needs | Can start |
 | --- | --- | --- | --- |
 | **U2** ✅ | `/app/pages` and `/app/pages/new`: paginated list, creation, confirmed deletion | R1.1 ✅ exists | built |
-| **U3** ✅ | `/app/pages/:id`: appearance, links, scheduling, publication, and shared renderer preview | R1.1 ✅ exists | built |
+| **U3** ✅ | the merged editor at `/app/editor/links`, `/design` and `/settings`: appearance, links, scheduling, publication, and shared renderer preview (originally `/app/pages/:id`, now a redirect) | R1.1 ✅ exists | built |
 | **U4** ✅ | the real `/:slug` and `/p/:slug` public renderer | R1.7 public read with identity ✅ | built |
 | **U5** 🚧 | avatar crop/upload plus page-image upload for link thumbnails | R1.3 ✅ API complete | implemented; full browser acceptance pending |
 | **U6** 🚧 | the address field, live availability check, and the rename confirmation | R1.4 ✅ API complete | implemented; full browser acceptance pending |
@@ -243,9 +255,9 @@ one change set (the console namespace, and the profile screen that consumes R1.1
 | Surface | Reality |
 | --- | --- |
 | Router | `createBrowserRouter` over a `RouteObject[]` (`App.tsx`), rendered by `main.tsx`, with two top-level branches: `AppShell` (chrome + guards) and `PublicLayout` (no chrome, no session). `useBlocker` is therefore available. |
-| Console routes | `/app` (dashboard with profile/social editor) · `/app/profile` and `/app/socials` compatibility redirects · `/app/*` → console 404 that cannot fall through to a slug |
+| Console routes | `/app` (dashboard: identity preview, page summary, quick actions) · `/app/editor/<tab>` (the merged profile/links/design/analytics/settings editor; full-width, no rail) · `/app/pages` and `/app/pages/new` · `/app/submissions` · `/app/*` → console 404 that cannot fall through to a slug |
 | Auth routes | `/login`, `/register`, `/forgot-password`, `/reset-password` |
-| Compatibility | `/` → `/app` · `/profile` → `/app#profile-editor` · `/app/profile` and `/app/socials` → dashboard anchors |
+| Compatibility | `/` → `/app` · `/profile` → `/app/editor/profile` · `/app/profile`, `/app/socials`, `/app#profile-editor` and `/app#socials` → the Profile tab · `/app/analytics` and `/app/settings` → their tabs · `/app/pages/:id` → the tab its `#hash` names (`?page=<id>` selects the page) |
 | Public routes | `/:slug` and `/p/:slug` → `PublicPageRoute`: a layout skeleton with no session and no console chrome that fabricates nothing (the renderer is U4) |
 | Guards | `RequireAnonymous`, `RequireAuth` (`components/Guards.tsx`) with `safeNext` validating a local `next` path. `/app` requires a session only — what a session may DO is decided per screen, because the API's answers differ per action. |
 | Shell | `AppShell` owns the masthead, the maintenance banner, the suspension notice, skip-to-content and the footer. `ConsoleLayout` adds the rail (`ConsoleNav`) inside `/app`. |
@@ -299,10 +311,10 @@ instead of to a dialog about a form that can no longer be saved.
 | **U0** Console shell & namespace | `/app/*` layout, `/profile` redirect, public layout skeleton | — | **done** ✅ |
 | **U1** Profile identity & socials | `/app` dashboard profile editor | R1.1 ✅, R1.2 ✅ | **done** ✅ |
 | **U2** My pages & create | `/app/pages`, `/app/pages/new` | R1.1 ✅ | **built** ✅ |
-| **U3** Page editor: appearance, links, publish | `/app/pages/:id` | R1.1 ✅ | **built** ✅ |
+| **U3** Page editor: appearance, links, publish | `/app/editor/links`, `/design`, `/settings` | R1.1 ✅ | **built** ✅ |
 | **U4** Public renderer | `/:slug`, `/p/:slug` | R1.7 public read with identity ✅ | **built** ✅ |
 | **U5** Media picker & crop | avatar in the dashboard profile editor | R1.3 avatar API | implemented; full browser acceptance pending |
-| **U6** Address field & rename | address section in `/app/pages/:id` | R1.4 ✅ API complete | implemented; full browser acceptance pending |
+| **U6** Address field & rename | the address section of the editor's Settings tab | R1.4 ✅ API complete | implemented; full browser acceptance pending |
 | **U7** Links v2 in the editor | groups, bulk, trash, thumbnails, windows | R1.5 ✅ API complete | implemented; full browser acceptance pending |
 | **U8** Autosave, unpublished changes, versions | editor save state, version list | R1.6 ✅ API complete | implemented; selected failure checks; full acceptance pending |
 | **U9** Preview parity & sharing | server-driven preview, native share, QR (copy link shipped in R1.9) | R1.7 ✅ API complete | implemented; selected preview/QR checks; full acceptance pending |

@@ -23,6 +23,7 @@ INSERT OR IGNORE INTO settings (key, value, type, label, grp, description, is_pu
   ('platform.maintenance_message','We are performing scheduled maintenance. Please check back shortly.', 'string', 'Maintenance message', 'platform', 'Body returned while maintenance mode is on.', 1, 1735689600000),
 
   ('moderation.auto_flag_enabled',       'false', 'boolean', 'Automatic flagging',     'moderation', 'Run keyword rules against new page content.', 0, 1735689600000),
+  ('moderation.auto_flag_keywords',      '[]',    'json',    'Automatic flag keywords', 'moderation', 'Literal terms that create review flags; never trigger automatic sanctions.', 0, 1735689600000),
   ('moderation.require_reason',          'true',  'boolean', 'Reason required',        'moderation', 'Force a reason on every sanction.', 0, 1735689600000),
   ('moderation.report_cooldown_minutes', '0',     'number',  'Per-reporter cooldown',  'moderation', 'Minutes a reporter must wait between reports.', 0, 1735689600000),
 
@@ -42,7 +43,8 @@ INSERT OR IGNORE INTO settings (key, value, type, label, grp, description, is_pu
   ('appeals.window_days',  '30', 'number', 'Appeal window (days)', 'appeals', 'How long after a sanction an appeal is accepted.', 0, 1735689600000),
 
   ('audit.retention_days',  '0',     'number', 'Audit retention (days)', 'audit', '0 keeps audit logs forever.', 0, 1735689600000),
-  ('audit.export_max_rows', '50000', 'number', 'Audit export cap',       'audit', 'Maximum rows returned by a single export.', 0, 1735689600000);
+  ('audit.export_max_rows', '50000', 'number', 'Audit export cap',       'audit', 'Maximum rows returned by a single export.', 0, 1735689600000),
+  ('analytics.retention_days', '400', 'number', 'Analytics retention (days)', 'analytics', 'Minimum 90 days; maximum 10 years.', 0, 1735689600000);
 
 -- -------------------------------------------------------- email templates --
 INSERT OR IGNORE INTO email_templates (key, subject, body_text, variables, enabled, updated_at) VALUES
@@ -118,5 +120,7 @@ INSERT OR IGNORE INTO rate_limits (key, scope, max_requests, window_seconds, act
   -- Autosave is allowed to degrade; the dedicated route turns throttle depletion into a soft 429.
   ('page_autosave_user','user',  1200,   3600, 'throttle', 1, 1735689600000),
   ('report_create_ip',   'ip',     10,   3600, 'block',    1, 1735689600000),
+  ('appeal_create_user', 'user',   10,   3600, 'block',    1, 1735689600000),
   ('media_upload_user',  'user',   60,   3600, 'throttle', 1, 1735689600000),
+  ('analytics_event_ip', 'ip',    600,   3600, 'block',    1, 1735689600000),
   ('api_global',         'global', 6000, 60,   'throttle', 1, 1735689600000);

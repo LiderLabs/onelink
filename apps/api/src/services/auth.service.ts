@@ -126,6 +126,34 @@ export async function resolveSession(
 }
 
 /**
+ * A sanction revokes every session, but the affected person still needs a way
+ * to appeal without re-enabling their normal account access. This accepts only
+ * the prior, unexpired cookie for this user's suspension/ban appeal endpoints.
+ */
+export async function resolveSanctionAppealSession(
+  db: D1Database,
+  config: AppConfig,
+  token: string,
+): Promise<ResolvedSession | null> {
+  const tokenHash = await hashToken(token, config.sessionPepper)
+  const row = await db.prepare(`${SESSION_SELECT}
+    WHERE s.token_hash=? AND s.revoked_at IS NOT NULL LIMIT 1`).bind(tokenHash).first<SessionJoinRow>()
+  if (!row) return null
+
+  const session = sessionFromJoin(row)
+  const current = now()
+  if (session.expires_at <= current || session.impersonated_by !== null || row.deleted_at !== null || row.status === 'deleted') {
+    return null
+  }
+  if (session.revoked_reason !== 'user.suspend' && session.revoked_reason !== 'user.ban') return null
+  if (row.status !== 'suspended' && row.status !== 'banned') return null
+  const activeSanction = await db.prepare(`SELECT id FROM sanctions WHERE user_id=? AND status='active'
+    AND type IN ('suspend','ban') AND reason=? LIMIT 1`).bind(row.id, row.status_reason).first()
+  if (!activeSanction) return null
+  return { session, user: toAuthUser(row, session) }
+}
+
+/**
  * Slides an active session forward, at most once every SESSION_TOUCH_AFTER_MS
  * so a busy client does not cause a database write per request. The extension
  * is capped by SESSION_ABSOLUTE_TTL_MS.

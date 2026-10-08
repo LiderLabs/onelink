@@ -78,11 +78,9 @@ mediaRoutes.get('/files/avatars/:ownerId/:filename', async c => {
 mediaRoutes.get('/*', async (c) => {
   const key = servableKeyFrom(c.req.path)
   if (key === null) throw notFound('Media asset')
-  if (key.startsWith('avatars/')) {
-    const retired = await c.env.DB.prepare("SELECT id FROM media_assets WHERE r2_key=? AND status='deleted'")
-      .bind(key).first()
-    if (retired) throw notFound('Media asset')
-  }
+  const retired = await c.env.DB.prepare("SELECT id FROM media_assets WHERE r2_key=? AND status='deleted'")
+    .bind(key).first()
+  if (retired) throw notFound('Media asset')
 
   // `onlyIf` lets R2 answer a conditional request itself — a `304` with no body is
   // the cheap path for an object the browser already holds.
