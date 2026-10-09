@@ -10,9 +10,25 @@ const errors = []
 page.on('pageerror', error => errors.push(error.message))
 try {
   await page.goto(origin, { waitUntil: 'domcontentloaded' })
-  await page.getByRole('heading', { name: 'Connect more of you.', exact: true }).waitFor()
-  for (const width of [1440, 390, 320]) {
+  await page.getByRole('heading', { name: 'All your platforms. One link.', exact: true }).waitFor()
+  for (const width of [1440, 1024, 768, 390, 320]) {
     await page.setViewportSize({ width, height: 844 })
+    await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }))
+    const hero = page.locator('.landing-hero-content')
+    const heroBounds = await hero.boundingBox()
+    const hubBounds = await hero.locator('.landing-platform-hub').boundingBox()
+    assert.ok(Math.abs((hubBounds.x + hubBounds.width / 2) - (heroBounds.x + heroBounds.width / 2)) < 2, 'OneLink logo stays centered')
+    assert.equal(await hero.locator('.landing-platform-node').count(), 6)
+    for (const node of await hero.locator('.landing-platform-node').all()) {
+      for (const element of [node, node.locator('.landing-platform-label')]) {
+        const box = await element.boundingBox()
+        assert.ok(box.x >= heroBounds.x && box.x + box.width <= heroBounds.x + heroBounds.width, 'Platforms and labels fit inside the hero')
+        assert.ok(box.y + box.height <= hubBounds.y || box.y >= hubBounds.y + hubBounds.height || box.x + box.width <= hubBounds.x || box.x >= hubBounds.x + hubBounds.width, `Platform ${await node.innerText()} does not overlap the logo at ${width}px`)
+      }
+    }
+    const signupBounds = await hero.getByRole('link', { name: 'Sign up free', exact: true }).boundingBox()
+    assert.ok(signupBounds.y + signupBounds.height <= 844, `Hero signup is visible without scrolling at ${width}px`)
+    await page.screenshot({ path: `output/playwright/landing-platform-hero-${width}.png` })
     await page.evaluate(() => scrollTo({ top: 1700, behavior: 'instant' }))
     const nav = page.getByRole('navigation', { name: 'Main navigation' })
     const bounds = await nav.boundingBox()
@@ -40,8 +56,8 @@ try {
   await page.getByRole('heading', { name: 'Welcome back', exact: true }).waitFor()
   assert.equal(await page.locator('.landing-masthead').count(), 0, 'Landing chrome and animation effects clean up when leaving')
   await page.goto(origin, { waitUntil: 'domcontentloaded' })
-  await page.getByRole('heading', { name: 'Connect more of you.', exact: true }).waitFor()
+  await page.getByRole('heading', { name: 'All your platforms. One link.', exact: true }).waitFor()
   assert.equal(await page.locator('.landing-page').evaluate(el => el.getAnimations({ subtree: true }).length), 0, 'Reduced motion also applies on first render')
   assert.deepEqual(errors, [])
-  console.log('PASS Landing motion: sticky accessible navigation at 320–1440px, hero/scroll animations, dynamic and initial reduced motion, clean route transitions, no overflow/errors.')
+  console.log('PASS Landing hero: centered OneLink and six readable platforms, signup above the fold at 320–1440px, sticky navigation, hero/scroll animations, reduced motion, clean routes, no overflow/errors.')
 } finally { await browser.close() }

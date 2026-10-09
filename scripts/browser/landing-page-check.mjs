@@ -11,7 +11,7 @@ page.on('pageerror', error => errors.push(error.message))
 try {
   await page.goto(origin + '/', { waitUntil: 'domcontentloaded' })
   assert.equal(new URL(page.url()).pathname, '/', 'Root opens the public landing page instead of redirecting to auth')
-  await page.getByRole('heading', { name: 'Connect more of you.', exact: true }).waitFor()
+  await page.getByRole('heading', { name: 'All your platforms. One link.', exact: true }).waitFor()
   assert.equal(await page.locator('.creator-sidebar, .auth-form-panel').count(), 0)
   const hrefs = await page.locator('a').evaluateAll(links => links.map(link => link.getAttribute('href')))
   assert.ok(hrefs.includes('/login') && hrefs.includes('/register'))
@@ -29,7 +29,7 @@ try {
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `Auth has no horizontal overflow at ${width}px`)
       await homeLink.click()
       await page.waitForURL(origin + '/')
-      await page.getByRole('heading', { name: 'Connect more of you.', exact: true }).waitFor()
+      await page.getByRole('heading', { name: 'All your platforms. One link.', exact: true }).waitFor()
     }
   }
   await page.setViewportSize({ width: 1440, height: 1000 })
@@ -65,12 +65,12 @@ try {
   // The public homepage must remain readable when the API cannot be reached.
   await page.route('**/api/v1/**', route => route.abort())
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await page.getByRole('heading', { name: 'Connect more of you.', exact: true }).waitFor()
+  await page.getByRole('heading', { name: 'All your platforms. One link.', exact: true }).waitFor()
   assert.equal(new URL(page.url()).pathname, '/')
   await page.unroute('**/api/v1/**')
   await page.goto(origin + '/p/landing-route-check', { waitUntil: 'domcontentloaded' })
   await page.locator('.public-layout').waitFor()
-  assert.equal(await page.getByRole('heading', { name: 'Connect more of you.', exact: true }).count(), 0, 'Published page routes remain separate')
+  assert.equal(await page.getByRole('heading', { name: 'All your platforms. One link.', exact: true }).count(), 0, 'Published page routes remain separate')
   assert.deepEqual(errors, [])
   console.log('PASS Landing: auth round trips, footer Back to top with keyboard and reduced-motion support, real reloads for secondary links, 320–1440px, offline API, public-route separation, no browser errors.')
 } catch (error) {

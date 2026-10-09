@@ -41,7 +41,7 @@ export function useLandingMotion() {
       if (reducedMotion.matches) return
 
       page.querySelectorAll('.landing-hero-copy > *').forEach((element, index) => enter(element, index * 75))
-      page.querySelectorAll('.landing-example-page, .landing-everywhere, .landing-music, .landing-social-orbit').forEach((element, index) => enter(element, 150 + index * 100))
+      page.querySelectorAll('.landing-platform-hub, .landing-platform-node, .landing-hero-actions').forEach((element, index) => enter(element, 150 + index * 60))
 
       if (typeof IntersectionObserver === 'undefined') return
       reveals = new IntersectionObserver(entries => {
@@ -56,21 +56,26 @@ export function useLandingMotion() {
       }, { threshold: .12, rootMargin: '0px 0px -32px 0px' })
       page.querySelectorAll('.landing-content .landing-section-heading, .landing-feature-card, .landing-destination, .landing-possibilities, .landing-ready, .landing-footer-card, .landing-wordmark').forEach(element => reveals?.observe(element))
 
-      const floating = Array.from(page.querySelectorAll('.landing-orbit, .landing-art-flower')).map((element, index) => {
+      const floating = Array.from(page.querySelectorAll('.landing-platform-icon')).map((element, index) => {
         const transform = getComputedStyle(element).transform
         const base = transform === 'none' ? '' : transform
         const animation = animate(element, [
           { transform: `${base} translateY(0px)` },
-          { transform: `${base} translateY(-9px)` },
+          { transform: `${base} translateY(-4px)` },
         ], { duration: 3200 + index * 450, iterations: Infinity, direction: 'alternate', easing: 'cubic-bezier(.45,0,.55,1)' })
+        animation.pause()
+        return animation
+      })
+      const connectionFlows = Array.from(page.querySelectorAll('.landing-connection-flow')).map(element => {
+        const animation = animate(element, [{ strokeDashoffset: '0' }, { strokeDashoffset: '-40' }], { duration: 2400, iterations: Infinity })
         animation.pause()
         return animation
       })
       artworkVisibility = new IntersectionObserver(entries => {
         const visible = entries.some(entry => entry.isIntersecting)
-        floating.forEach(animation => visible ? animation.play() : animation.pause())
+        floating.concat(connectionFlows).forEach(animation => visible ? animation.play() : animation.pause())
       }, { threshold: .1 })
-      const artwork = page.querySelector('.landing-artwork')
+      const artwork = page.querySelector('.landing-network')
       if (artwork) artworkVisibility.observe(artwork)
     }
 

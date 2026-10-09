@@ -1,12 +1,11 @@
 ﻿import { useEffect } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { AddressBook, ArrowRight, ArrowUp, ArrowUpRight, CurrencyCircleDollar, EnvelopeOpen, FacebookLogo, Flower, Globe, Headphones, Heart, InstagramLogo, MagnifyingGlass, Microphone, PaypalLogo, PinterestLogo, RedditLogo, ShoppingBag, SoundcloudLogo, Sparkle, SpotifyLogo, SquaresFour, Textbox, Ticket, TiktokLogo, TwitchLogo, TwitterLogo, Users, Waveform, YoutubeLogo } from '@phosphor-icons/react'
+import { AddressBook, ArrowRight, ArrowUp, ArrowUpRight, CurrencyCircleDollar, EnvelopeOpen, FacebookLogo, Flower, Heart, InstagramLogo, Microphone, PaypalLogo, PinterestLogo, RedditLogo, ShoppingBag, SoundcloudLogo, Sparkle, SpotifyLogo, SquaresFour, Textbox, Ticket, TiktokLogo, TwitchLogo, TwitterLogo, Users, Waveform, YoutubeLogo } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { OneLinkBrand } from '../../components/OneLinkBrand'
 import { useSession } from '../../lib/session'
-import { PageRenderer } from '../pages/PageRenderer'
-import type { PageRenderModel } from '../pages/PageRenderer'
+import { PlatformHero } from './PlatformHero'
 import { useLandingMotion } from './use-landing-motion'
 import './landing.css'
 
@@ -61,29 +60,32 @@ function DestinationSection({ title, items, browseLabel = 'See all' }: { title: 
   </section>
 }
 
-function HeroArtwork() {
-  // Uses the actual public-page renderer, with illustrative content only.
-  const homepage = new URL('/', window.location.origin).href
-  const demo: PageRenderModel = {
-    slug: 'mikejay', title: 'Mike Jay', bio: 'Making things. Sharing stories. Finding my people.', theme: 'dark', layout: 'list', accentColor: '#00d8ef', showBranding: true,
-    owner: { username: 'mikejay', displayName: 'Mike Jay', avatarUrl: null, bio: null, location: null, pronouns: null, socials: [{ platform: 'instagram', url: homepage, position: 0 }, { platform: 'youtube', url: homepage, position: 1 }] },
-    links: ['My latest work', 'Watch my videos', 'Let’s connect'].map((title, position) => ({ id: `landing-example-${position}`, title, position, url: homepage, domain: null, description: null, icon: null, isVisible: true, startsAt: null, endsAt: null, groupId: null, openInNewTab: false, thumbnailKey: null, status: 'active', createdAt: 0, updatedAt: 0 })),
-  }
-  return <div className="landing-artwork" aria-hidden="true" inert>
-    <div className="landing-art-canvas">
-      <span className="landing-orbit landing-orbit-pink" /><span className="landing-orbit landing-orbit-cyan" /><span className="landing-orbit landing-orbit-orange" />
-      <Flower className="landing-art-flower" size={128} weight="fill" />
-      <div className="landing-example-page"><PageRenderer page={demo} /></div>
-      <div className="landing-everywhere"><Globe size={36} weight="light" /><strong>One link.<br />Everywhere.</strong><span>All the things you do.</span></div>
-      <div className="landing-music"><span className="landing-music-label">ON REPEAT</span><div className="landing-headphones"><Headphones size={84} weight="light" /></div><strong>A little more you.</strong><Waveform size={96} weight="light" /><span>Music. Stories. Everything.</span></div>
-      <div className="landing-social-orbit"><InstagramLogo size={22} /><YoutubeLogo size={24} /><TiktokLogo size={22} /></div>
-    </div>
-  </div>
-}
-
 export function LandingPageRoute() {
   const { platformName } = useSession()
   const motionRoot = useLandingMotion()
+  useEffect(() => {
+    const page = motionRoot.current
+    const header = page?.querySelector<HTMLElement>('.landing-masthead')
+    if (!page || !header || typeof IntersectionObserver === 'undefined') return
+    // Watch the strip behind the transparent header to adapt text to light and dark sections.
+    const darkSurfaces = page.querySelectorAll('.landing-hero, .landing-ready, .landing-wordmark')
+    let observer: IntersectionObserver
+    const observe = () => {
+      observer?.disconnect()
+      const visible = new Set<Element>()
+      observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => entry.isIntersecting ? visible.add(entry.target) : visible.delete(entry.target))
+        header.classList.toggle('landing-masthead-light', visible.size === 0)
+      }, { rootMargin: `0px 0px -${Math.max(0, window.innerHeight - header.offsetHeight)}px 0px` })
+      darkSurfaces.forEach(surface => observer.observe(surface))
+    }
+    observe()
+    window.addEventListener('resize', observe)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', observe)
+    }
+  }, [motionRoot])
   const scrollToHero = () => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     window.scrollTo({ top: 0, behavior: reducedMotion ? 'instant' : 'smooth' })
@@ -94,7 +96,7 @@ export function LandingPageRoute() {
     const theme = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
     const previousTheme = theme?.content
     document.title = `${platformName} | All of you. One link.`
-    if (theme) theme.content = '#08257e'
+    if (theme) theme.content = '#07121f'
     const existingDescription = document.querySelector<HTMLMetaElement>('meta[name="description"]')
     const description = existingDescription ?? document.createElement('meta')
     const previousDescription = description.content
@@ -121,11 +123,16 @@ export function LandingPageRoute() {
     <main id="landing-main">
       <div className="landing-hero">
         <section className="landing-hero-content landing-container" aria-labelledby="landing-title">
-          <div className="landing-hero-copy"><p className="landing-eyebrow">Your world. One link.</p><h1 id="landing-title" tabIndex={-1}>Connect<br />more of you.</h1><p className="landing-hero-description">Bring the best of you from across the internet into one place. Your own little corner, with a link to everything.</p>
-            <Link to="/register" className="landing-hero-cta">Sign up free<span><ArrowUpRight size={22} aria-hidden="true" /></span></Link>
-            <ReloadLink className="landing-discover"><MagnifyingGlass size={20} aria-hidden="true" /><span>Explore what you can share</span><ArrowRight size={19} aria-hidden="true" /></ReloadLink>
+          <div className="landing-hero-copy">
+            <p className="landing-eyebrow">Your world, connected</p>
+            <h1 id="landing-title" tabIndex={-1}>All your platforms.<span> One link.</span></h1>
+            <p className="landing-hero-description">Bring your content, socials, and business together in one place. Share your world with a single link.</p>
           </div>
-          <HeroArtwork />
+          <PlatformHero brandName={platformName} />
+          <div className="landing-hero-actions">
+            <Link to="/register" className="landing-hero-cta">Sign up free<span><ArrowUpRight size={22} aria-hidden="true" /></span></Link>
+            <ReloadLink className="landing-discover">Explore platforms<ArrowRight size={19} aria-hidden="true" /></ReloadLink>
+          </div>
         </section>
       </div>
 
