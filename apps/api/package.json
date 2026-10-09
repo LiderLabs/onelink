@@ -23,9 +23,9 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "^1.3.6",
+    "@cloudflare/vitest-plugin": "^0.0.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11",
-    "wrangler": "^4.147.0"
+    "wrangler": "^4.15.2"
   }
 }

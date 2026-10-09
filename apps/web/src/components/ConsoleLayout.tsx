@@ -20,10 +20,11 @@ export function ConsoleLayout() {
   const links = useMatch('/app/links')
   const analytics = useMatch('/app/analytics')
   const share = useMatch('/app/share')
+  const settings = useMatch('/app/settings')
   const editor = useMatch('/app/pages/:id')
   const editorEntry = useMatch('/app/editor')
   return (
-    <div className={overview || setup || links || analytics || share || editorEntry || (editor && editor.params.id !== 'new') ? 'min-w-0' : 'creator-legacy min-w-0'}>
+    <div className={overview || setup || links || analytics || share || settings || editorEntry || (editor && editor.params.id !== 'new') ? 'min-w-0' : 'creator-legacy min-w-0'}>
       <Outlet />
     </div>
   )

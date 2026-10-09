@@ -225,6 +225,14 @@
 .creator-onboarding-socials .profile-section > .reveal.border-dashed { margin-top: .25rem; border-radius: .75rem; background: #10131b; }
 .creator-shell .creator-card .creator-legacy .profile-photo-avatar { border-radius: 50%; }
 
+.creator-settings { min-width: 0; }
+.creator-settings-section { margin-top: 2.25rem; }
+.creator-settings-list { margin-top: 1rem; }
+.creator-settings-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem 1.5rem; }
+.creator-settings-row > div { flex: 1 1 22rem; min-width: 0; }
+.creator-settings-row h3 { font-size: 1rem; font-weight: 500; letter-spacing: -.015em; }
+.creator-settings-row p { margin-top: .375rem; max-width: 44rem; color: var(--creator-muted); font-size: .8125rem; line-height: 1.6; }
+
 /* Preview and public page use the same renderer, including theme and accent. */
 .page-renderer { font-family: 'Outfit', var(--font-sans); border-radius: inherit; }
 .page-renderer h1 { font-family: inherit; font-weight: 600; font-size: clamp(1.75rem, 4vw, 2.5rem); line-height: 1.2; letter-spacing: -.04em; }
