@@ -18,8 +18,9 @@ import { CreatorAnalyticsRoute } from './features/creator/CreatorAnalyticsRoute'
 import { CreatorShareRoute } from './features/creator/CreatorShareRoute'
 import { CreatorEntryRoute, CreatorEditorEntryRoute } from './features/creator/CreatorEntryRoute'
 import { OnboardingRoute } from './features/creator/OnboardingRoute'
-import { ProfileScreen } from './features/profile/ProfileScreen'
-import { SettingsRoute, SubmissionsRoute } from './features/console/R2Routes'
+import { SubmissionsRoute } from './features/console/R2Routes'
+import { LegacyProfileRedirect, SettingsRoute } from './features/creator/CreatorSettingsRoute'
+import { LandingPageRoute } from './features/landing/LandingPageRoute'
 import { Navigate } from 'react-router-dom'
 import type { RouteObject } from 'react-router-dom'
 
@@ -75,12 +76,13 @@ export const routes: RouteObject[] = [
               { path: 'dashboard', element: <CreatorDashboardRoute /> },
               { path: 'editor', element: <CreatorEditorEntryRoute /> },
               { path: 'onboarding', element: <OnboardingRoute /> },
-              { path: 'profile', element: <ProfileScreen /> },
-              { path: 'socials', element: <Navigate to="/app/profile#socials" replace /> },
+              { path: 'profile', element: <LegacyProfileRedirect /> },
+              { path: 'socials', element: <Navigate to="/app/settings/profile#socials" replace /> },
               { path: 'links', element: <CreatorLinksRoute /> },
               { path: 'share', element: <CreatorShareRoute /> },
               { path: 'analytics', element: <CreatorAnalyticsRoute /> },
-              { path: 'settings', element: <SettingsRoute /> },
+              { path: 'settings', element: <Navigate to="/app/settings/profile" replace /> },
+              { path: 'settings/:section', element: <SettingsRoute /> },
               { path: 'submissions', element: <SubmissionsRoute /> },
               { path: 'pages', element: <PageListRoute /> },
               { path: 'pages/new', element: <PageCreateRoute /> },
@@ -94,8 +96,8 @@ export const routes: RouteObject[] = [
       // Kept for bookmarks: `/profile` was the account screen before the console
       // namespace existed. A `profile` slug is still served at `/p/profile`, so
       // this alias costs one public address, not every one of them.
-      { path: '/profile', element: <Navigate to="/app/profile" replace /> },
-      { path: '/', element: <Navigate to="/app" replace /> },
+      { path: '/profile', element: <LegacyProfileRedirect /> },
+      { path: '/', element: <LandingPageRoute /> },
       { path: '*', element: <NotFoundRoute /> },
     ],
   },

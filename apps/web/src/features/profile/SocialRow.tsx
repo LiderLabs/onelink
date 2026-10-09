@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { ArrowDown, ArrowUp, PencilSimple, Trash } from '@phosphor-icons/react'
+import { SocialIcon } from '../../components/SocialIcon'
 import { errorMessageFor, fieldErrorsFrom } from '../../lib/api'
 import { Button } from '../../components/Button'
 import { CheckboxField, Field, SelectField } from '../../components/Field'
@@ -35,6 +37,7 @@ export interface SocialRowProps {
   onDelete: (social: SocialLink) => void
   onSaved: (message: string) => void
   onPreviewChange?: (id: string, draft: Partial<PreviewSocial> | null) => void
+  compact?: boolean
 }
 
 export function SocialRow({
@@ -47,6 +50,7 @@ export function SocialRow({
   onDelete,
   onSaved,
   onPreviewChange,
+  compact = false,
 }: SocialRowProps) {
   const [editing, setEditing] = useState(false)
   const [platform, setPlatform] = useState<string>(social.platform)
@@ -167,9 +171,10 @@ export function SocialRow({
   }
 
   return (
-    <li className="profile-social-row border-b border-rule py-4">
+    <li className={`profile-social-row border-b border-rule py-4${compact ? ' is-compact' : ''}`}>
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        <div className="min-w-0">
+        {compact ? <span className="creator-editor-social-symbol"><SocialIcon platform={social.platform} label={label} size={21} /></span> : null}
+        <div className="min-w-0 creator-editor-social-address">
           <p className="eyebrow">
             {label}
             <span className="ml-2 text-ink-faint">#{index + 1}</span>
@@ -198,7 +203,7 @@ export function SocialRow({
             aria-label={`Move the ${label} link up`}
             onClick={() => onMove(index, -1)}
           >
-            Move up
+            {compact ? <ArrowUp size={17} /> : 'Move up'}
           </Button>
           <Button
             variant="outline"
@@ -207,7 +212,7 @@ export function SocialRow({
             aria-label={`Move the ${label} link down`}
             onClick={() => onMove(index, 1)}
           >
-            Move down
+            {compact ? <ArrowDown size={17} /> : 'Move down'}
           </Button>
           <Button
             variant="outline"
@@ -216,7 +221,7 @@ export function SocialRow({
             aria-label={`Edit the ${label} link`}
             onClick={startEditing}
           >
-            Edit
+            {compact ? <PencilSimple size={17} /> : 'Edit'}
           </Button>
           <Button
             variant="danger"
@@ -225,7 +230,7 @@ export function SocialRow({
             aria-label={`Delete the ${label} link`}
             onClick={() => onDelete(social)}
           >
-            Delete
+            {compact ? <Trash size={17} /> : 'Delete'}
           </Button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { ArrowLeft } from '@phosphor-icons/react'
 import { useSession } from '../lib/session'
 
 export function AuthIcon({ name }: { name: 'user' | 'email' | 'key' | 'shield' | 'eye' | 'eye-off' | 'arrow' | 'brand' }) {
@@ -38,6 +39,10 @@ export function AuthPage({ title, description, children, variant = 'login' }: {
   }, [title, platformName])
   return (
     <div className={`auth-layout auth-layout-${variant}`}>
+      <Link to="/" className="auth-home-link">
+        <ArrowLeft size={18} aria-hidden="true" />
+        Back to home
+      </Link>
       <section className="auth-form-panel" aria-labelledby="auth-title">
         <div className="auth-form-heading">
           <Link to="/" className="auth-brand" aria-label={`${platformName} home`}>

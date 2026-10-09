@@ -1,0 +1,130 @@
+.creator-settings { min-width: 0; }
+.creator-settings h1, .creator-settings h2, .creator-settings h3 { font-family: inherit; }
+.creator-settings #socials { scroll-margin-top: 7rem; }
+.creator-settings-layout { display: grid; grid-template-columns: 14.75rem minmax(0, 1fr); align-items: start; gap: 1.5rem; }
+.creator-settings-nav { position: sticky; top: 6.25rem; display: grid; gap: 1.25rem; padding: 1rem .625rem; border: 1px solid var(--creator-border); border-radius: 1rem; background: var(--creator-surface); }
+.creator-settings-nav-group > p { padding: .375rem .75rem .625rem; color: var(--creator-muted); font-size: .625rem; font-weight: 500; text-transform: uppercase; letter-spacing: .1em; }
+.creator-settings-nav a { display: flex; align-items: center; gap: .625rem; padding: .75rem; min-height: 2.75rem; border-radius: .625rem; color: #a6b1c0; font-size: .8125rem; }
+.creator-settings-nav a:hover { background: #00d8ef08; color: #f3f5fa; }
+.creator-settings-nav a[aria-current=page] { background: #00d8ef16; color: var(--creator-accent); }
+.creator-settings-nav-group:last-child a { color: #df989f; }
+.creator-settings-nav-group:last-child a[aria-current=page] { background: #df989f0d; color: #ffadb5; }
+.creator-settings-content { min-width: 0; }
+.creator-settings-content > [role=status], .creator-settings-content > [role=alert] { margin-bottom: 1.25rem; }
+.creator-settings-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+.creator-settings-section-heading h2 { display: flex; align-items: center; gap: .625rem; font-size: 1.375rem; font-weight: 500; line-height: 1.3; letter-spacing: -.025em; }
+.creator-settings-section-heading h2 svg { color: var(--creator-accent); }
+.creator-settings-section-heading p { margin-top: .375rem; color: var(--creator-muted); font-size: .8125rem; line-height: 1.6; }
+.creator-settings-section-heading > span { flex-shrink: 0; padding-top: .3rem; color: var(--creator-muted); font-size: .6875rem; }
+.creator-settings-stack { display: grid; gap: 1.25rem; }
+.creator-settings-account { display: flex; align-items: center; gap: 1.25rem; padding: 1.5rem; border: 1px solid #00d8ef30; border-radius: 1rem; background: linear-gradient(110deg, #00d8ef10, #00d8ef03), var(--creator-surface); }
+.creator-settings-account > div { min-width: 0; flex: 1; }
+.creator-settings-account h3 { font-size: 1.125rem; font-weight: 500; overflow-wrap: anywhere; }
+.creator-settings-account p { margin-top: .25rem; color: var(--creator-muted); font-size: .8125rem; overflow-wrap: anywhere; }
+.creator-settings-account a { display: inline-flex; align-items: center; gap: .3rem; margin-top: .625rem; color: var(--creator-accent); font-size: .75rem; }
+.creator-settings-avatar { display: grid; place-items: center; flex-shrink: 0; width: 4.75rem; height: 4.75rem; border-radius: 50%; border: 1px solid #00d8ef55; color: var(--creator-accent); background: #00d8ef12; font-size: 1.5rem; }
+.creator-settings-card-heading { display: flex; align-items: flex-start; gap: .75rem; margin-bottom: 1.5rem; }
+.creator-settings-card-heading > svg { margin-top: .125rem; color: var(--creator-accent); }
+.creator-settings-card-heading > div { flex: 1; min-width: 0; }
+.creator-settings h3 { font-weight: 500; }
+.creator-settings-card-heading p, .creator-settings-help { margin-top: .375rem; color: var(--creator-muted); font-size: .8125rem; line-height: 1.6; }
+.creator-settings-detail-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+.creator-settings-detail-row > div { flex: 1; min-width: 0; }
+.creator-settings-detail-row strong { font-size: .875rem; font-weight: 500; overflow-wrap: anywhere; }
+.creator-settings-shortcuts { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.creator-settings-shortcuts a { display: grid; gap: .5rem; padding: 1.125rem; border: 1px solid var(--creator-border); border-radius: .75rem; background: var(--creator-bg); }
+.creator-settings-shortcuts a:hover { border-color: #00d8ef60; }
+.creator-settings-shortcuts svg { color: var(--creator-accent); margin-bottom: .375rem; }
+.creator-settings-shortcuts strong { font-size: .875rem; font-weight: 500; }
+.creator-settings-shortcuts span { font-size: .75rem; line-height: 1.6; color: var(--creator-muted); }
+.creator-settings-banner { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 1.25rem; border: 1px solid #00d8ef35; border-radius: 1rem; background: #00d8ef09; }
+.creator-settings-banner > svg { color: var(--creator-accent); }
+.creator-settings-banner > div { flex: 1; min-width: min(100%, 14rem); }
+.creator-settings-banner strong { font-weight: 500; font-size: .875rem; }
+.creator-settings-banner p { margin-top: .375rem; color: var(--creator-muted); font-size: .8125rem; line-height: 1.6; }
+.creator-settings .profile-section-number, .creator-settings .profile-section-note { display: none; }
+.creator-settings .creator-settings-profile .profile-photo.is-compact > .profile-section-heading { display: none; }
+.creator-settings .creator-settings-profile .profile-photo { padding-top: 0; border-top: 0; }
+.creator-settings .profile-photo-avatar { width: 4.5rem; height: 4.5rem; border-radius: 50%; border: 1px solid #00d8ef55; }
+.creator-settings .profile-section-heading { gap: 1rem; }
+.creator-settings .profile-section-heading > div { min-width: 0; }
+.creator-settings .profile-section-heading h2 { font-size: 1.125rem; }
+.creator-settings .profile-save-status { font-size: .6875rem; }
+.creator-settings .profile-save-status.is-dirty { color: #e5ba63; }
+.creator-settings .profile-identity { padding-bottom: 0; }
+.creator-settings .profile-section-description { font-size: .8125rem; }
+.creator-settings label.eyebrow { font-family: inherit; font-size: .8125rem; letter-spacing: 0; text-transform: none; color: #dce2ee; }
+.creator-settings .creator-legacy form p.font-mono { font-family: inherit; letter-spacing: 0; }
+.creator-settings .creator-legacy input:focus, .creator-settings .creator-legacy select:focus, .creator-settings .creator-legacy textarea:focus { border-color: var(--creator-accent); }
+.creator-settings .creator-legacy input:disabled, .creator-settings .creator-legacy textarea:disabled { opacity: .6; }
+.creator-settings .profile-socials { padding-block: 0; border-top: 0; }
+.creator-settings .profile-socials h2 { display: flex; align-items: center; gap: .625rem; }
+.creator-settings .profile-socials h2 svg { color: var(--creator-accent); }
+.creator-settings-password button[type=submit] { width: auto; min-width: 10rem; margin-left: auto; display: flex; }
+.creator-settings .profile-socials > ul { border-top: 0; display: grid; gap: .75rem; }
+.creator-settings .profile-social-row.is-compact { border: 1px solid var(--creator-border); border-radius: .75rem; padding: 1rem; background: var(--creator-bg); }
+.creator-settings .profile-social-row.is-compact > div { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.creator-settings .profile-social-row .creator-editor-social-address { flex: 1; min-width: 0; }
+.creator-settings .profile-social-row .eyebrow { text-transform: none; letter-spacing: 0; font-family: inherit; }
+.creator-settings .creator-editor-add-social { width: 100%; margin-top: 1rem; }
+.creator-settings .profile-account { padding: 1.5rem; border: 1px solid var(--creator-border); border-radius: 1rem; background: var(--creator-surface); }
+.creator-settings .profile-account-title h2 { font-size: 1.125rem; font-weight: 500; }
+.creator-settings .profile-account-description, .creator-settings .profile-account dt { color: var(--creator-muted); }
+.creator-settings .profile-account-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+.creator-settings .profile-account-facts > div { margin: 0; }
+.creator-settings .profile-account dd { font-size: .8125rem; }
+.creator-settings-options { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.creator-settings-option { position: relative; display: flex; align-items: center; gap: .625rem; flex-wrap: wrap; padding: .875rem; border: 1px solid var(--creator-border); border-radius: .875rem; text-align: left; font-size: .8125rem; }
+.creator-settings-option[aria-pressed=true] { border-color: var(--creator-accent); background: #00d8ef08; }
+.creator-settings-option > svg { margin-left: auto; color: var(--creator-accent); }
+.creator-settings-swatch { display: grid; gap: .4rem; width: 100%; min-height: 5rem; padding: 1.125rem 2rem; border-radius: .5rem; background: #0c0e14; border: 1px solid #333b49; }
+.creator-settings-swatch.is-midnight { background: #04090c; border-color: #17333d; }
+.creator-settings-swatch > span { height: .5rem; border-radius: .125rem; background: #252b38; }
+.creator-settings-swatch > span:first-child { width: 60%; background: var(--creator-accent); }
+.creator-settings-swatch > span:last-child { width: 80%; }
+.creator-settings-segment { display: flex; gap: .25rem; padding: .25rem; width: fit-content; border: 1px solid var(--creator-border); border-radius: .75rem; background: var(--creator-bg); }
+.creator-settings-segment button { padding: .625rem 1rem; border-radius: .5rem; font-size: .8125rem; color: var(--creator-muted); }
+.creator-settings-segment button[aria-pressed=true] { color: #04171c; background: var(--creator-accent); }
+.creator-settings-preference { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--creator-border); }
+.creator-settings-preference strong { font-size: .875rem; font-weight: 500; }
+.creator-settings-preference small { display: block; margin-top: .375rem; color: var(--creator-muted); font-size: .75rem; line-height: 1.6; }
+.creator-settings-preference input { width: 1.125rem; height: 1.125rem; accent-color: var(--creator-accent); }
+.creator-settings-preference > svg { color: var(--creator-muted); }
+.creator-settings-footer, .creator-settings-danger-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+.creator-settings-footer p, .creator-settings-danger-footer p { font-size: .75rem; color: var(--creator-muted); }
+.creator-settings-danger { border-color: #713d48; }
+.creator-settings-danger .creator-settings-card-heading > svg { color: #ffa4ad; }
+.creator-settings-danger-footer { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #713d4844; }
+.creator-settings-danger-footer button { color: #ffadb5; background: #713d4822; border-color: #713d48; }
+.creator-settings .photo-crop-dialog { color: #edf0f7; background: var(--creator-surface); border-color: var(--creator-border); }
+.creator-settings .photo-crop-content > p:not(.profile-kicker), .creator-settings .photo-crop-zoom span { color: var(--creator-muted); }
+.creator-settings .photo-crop-dialog::backdrop { background: #03050ac9; }
+.creator-shell[data-workspace-tone=midnight] { --creator-bg: #04090c; --creator-surface: #0c171e; --creator-border: #1d333f; --color-paper: #08141a; --color-paper-deep: #11242d; --color-rule: #1d333f; }
+.creator-shell[data-workspace-tone=midnight] .creator-sidebar, .creator-shell[data-workspace-tone=midnight] .creator-topbar { background: #081117; }
+.creator-shell[data-workspace-density=compact] .creator-main { padding-block: 1.5rem 2.5rem; }
+.creator-shell[data-workspace-density=compact] .creator-card { padding: 1.125rem; }
+.creator-shell[data-workspace-density=compact] .creator-sidebar nav a { padding-block: .5rem; min-height: 2.375rem; }
+.creator-shell[data-workspace-density=compact] .creator-settings-stack { gap: 1rem; }
+.creator-shell[data-workspace-motion=reduced] *, .creator-shell[data-workspace-motion=reduced] *::before, .creator-shell[data-workspace-motion=reduced] *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+@media (max-width: 1100px) { .creator-settings-layout { grid-template-columns: 12.5rem minmax(0, 1fr); gap: 1.125rem; } .creator-settings-section-heading > span { display: none; } }
+@media (max-width: 900px) {
+  .creator-settings-layout { grid-template-columns: 1fr; }
+  .creator-settings-nav { position: static; display: flex; gap: 1rem; overflow-x: auto; padding: .5rem; }
+  .creator-settings-nav-group { display: flex; gap: .25rem; flex-shrink: 0; }
+  .creator-settings-nav-group > p { display: none; }
+  .creator-settings-nav a { white-space: nowrap; }
+}
+@media (max-width: 600px) {
+  .creator-settings .creator-heading { margin-bottom: 1.25rem; }
+  .creator-settings .creator-heading > .creator-badge { display: none; }
+  .creator-settings-account { padding: 1.125rem; gap: .875rem; flex-wrap: wrap; }
+  .creator-settings-account > .creator-badge { display: none; }
+  .creator-settings-avatar { width: 3.75rem; height: 3.75rem; }
+  .creator-settings-section-heading h2 { font-size: 1.25rem; }
+  .creator-settings-shortcuts, .creator-settings .profile-account-facts { grid-template-columns: 1fr; }
+  .creator-settings .profile-section-heading { flex-wrap: wrap; gap: .375rem; }
+  .creator-settings .profile-photo-controls { align-items: flex-start; gap: .875rem; }
+  .creator-settings .profile-photo-avatar { width: 3.5rem; height: 3.5rem; }
+  .creator-settings-options { gap: .625rem; }
+  .creator-settings-swatch { padding-inline: .75rem; }
+}

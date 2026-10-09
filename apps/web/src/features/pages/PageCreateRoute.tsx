@@ -163,7 +163,7 @@ export function PageCreateRoute() {
             label="Theme"
             value={values.theme}
             onChange={(event) => update('theme', event.currentTarget.value === 'dark' ? 'dark' : 'light')}
-            options={[{ value: 'light', label: 'Light paper' }, { value: 'dark', label: 'Dark ink' }]}
+            options={[{ value: 'light', label: 'Black with cyan glow' }, { value: 'dark', label: 'Solid black' }]}
           />
           <SelectField
             label="Link layout"

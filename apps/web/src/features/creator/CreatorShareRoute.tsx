@@ -9,6 +9,7 @@ import { useSession } from '../../lib/session'
 import type { OwnerPage, PublicPageDto } from '../../lib/types'
 import { getPagePreview, getPublicPage, publicPagePath } from '../pages/api'
 import { PageRenderer } from '../pages/PageRenderer'
+import { PublishedPageLink } from '../pages/PublishedPageLink'
 import { getSetupPages } from './setup-state'
 import './creator-share.css'
 
@@ -215,7 +216,7 @@ export function CreatorShareRoute() {
         <section className="creator-share-card creator-share-url-card" aria-labelledby="share-link-heading">
           <div className="creator-share-card-title"><span className="creator-share-symbol"><LinkSimple size={22} /></span><div><h2 id="share-link-heading">Your unique link</h2><p>A little link that opens up your whole world.</p></div><span className={`creator-share-state ${live ? 'is-live' : ''}`}>{stateLabel}</span></div>
           <div className="creator-share-address"><input id="share-page-address" aria-label="Page address" readOnly value={address} /><button type="button" aria-label="Copy address" title="Copy address" onClick={() => void copyAddress()}><Copy size={20} /></button></div>
-          <div className="creator-share-link-actions"><button type="button" className="creator-button creator-button-primary" aria-label="Share page" aria-describedby="share-availability" disabled={!live} onClick={() => void sharePage()}><ShareNetwork size={17} />Share link</button>{live ? <Link className="creator-share-open" to={publicPagePath(selected.slug)} target="_blank" rel="noopener noreferrer" aria-label="Open page">Open page<ArrowUpRight size={17} /></Link> : <button type="button" className="creator-share-open" onClick={() => void openPreview()}><LockSimple size={16} />Private preview</button>}</div>
+          <div className="creator-share-link-actions"><button type="button" className="creator-button creator-button-primary" aria-label="Share page" aria-describedby="share-availability" disabled={!live} onClick={() => void sharePage()}><ShareNetwork size={17} />Share link</button>{live ? <PublishedPageLink slug={selected.slug} className="creator-share-open" aria-label="Open page">Open page<ArrowUpRight size={17} /></PublishedPageLink> : <button type="button" className="creator-share-open" onClick={() => void openPreview()}><LockSimple size={16} />Private preview</button>}</div>
           <p id="share-availability" className="creator-share-availability">{live ? <Check size={15} /> : <Info size={15} />}<span>{availability}{!published && selected.moderationStatus === 'visible' && <Link to={`/app/pages/${selected.id}`}>Review & publish<ArrowRight size={13} /></Link>}{publicError && <button type="button" onClick={() => setPublicRetry(value => value + 1)}>Check again</button>}</span></p>
           {notice && <p role="status" className="creator-share-feedback">{notice}</p>}
         </section>

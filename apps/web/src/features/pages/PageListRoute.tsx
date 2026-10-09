@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Button } from '../../components/Button'
+import { Plus, SquaresFour } from '@phosphor-icons/react'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { EmptyState } from '../../components/EmptyState'
 import { ErrorNotice } from '../../components/ErrorNotice'
 import { Splash } from '../../components/StatusScreens'
-import { Toolbar } from '../../components/Toolbar'
 import { errorMessageFor } from '../../lib/api'
-import { formatRelative } from '../../lib/css'
 import type { OwnerPage, PageStatus } from '../../lib/types'
-import { deletePage, listMyPages, publicPagePath } from './api'
+import { deletePage, listMyPages } from './api'
+import { PageCard } from './PageCard'
+import './pages-list.css'
 
 const PAGE_SIZE = 12
 
@@ -111,61 +110,55 @@ export function PageListRoute() {
   if (pages === null && error === null) return <Splash label="Loading your pages" />
 
   return (
-    <section className="mx-auto max-w-7xl">
-      <div className="flex flex-wrap items-end justify-between gap-6 border-b border-ink pb-6">
+    <section className="creator-pages">
+      <header className="creator-heading">
         <div>
-          <p className="eyebrow">Your corner of the internet</p>
-          <h1 className="mt-2 font-display text-3xl font-medium tracking-tight sm:text-4xl">My pages</h1>
-          <p className="mt-3 max-w-xl text-sm leading-relaxed text-ink-soft">
-            Make a small home for the places people can find you.
+          <p className="creator-eyebrow">Your creator workspace</p>
+          <h1>My pages<span className="creator-accent" aria-hidden="true">.</span></h1>
+          <p>
+            Your pages, ready to edit and share. One home for every part of your world.
           </p>
         </div>
-        <Link to="/app/pages/new" className="inline-flex min-h-11 items-center border border-ink bg-ink px-5 font-mono text-xs uppercase tracking-[0.16em] text-white transition-colors hover:bg-white hover:text-ink">
-          Create a page <span className="ml-3 text-base" aria-hidden="true">↗</span>
+        <Link to="/app/pages/new" className="creator-button creator-button-primary">
+          <Plus size={18} />Create a page
         </Link>
-      </div>
+      </header>
 
       {error ? (
         <ErrorNotice error={error} action="Load your pages again" onRetry={() => setRetry((value) => value + 1)} />
       ) : pages?.length === 0 ? (
-        <div className="mt-8">
-          <EmptyState
-            title="A blank page, in the best way."
-            action={<Link to="/app/pages/new" className="font-mono text-xs uppercase tracking-[0.14em] underline underline-offset-4">Create your first page</Link>}
-          >
-            Your pages will live here. Start with a title and a memorable address; you can add links in the editor.
-          </EmptyState>
+        <div className="creator-pages-empty">
+          <SquaresFour size={36} weight="light" />
+          <h2>Your next page starts here</h2>
+          <p>Create a page, add your favorite links, and make it yours. You can publish when everything is ready.</p>
+          <Link to="/app/pages/new" className="creator-button creator-button-primary"><Plus size={17} />Create your first page</Link>
         </div>
       ) : (
         <>
           {meta ? (
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-              {statusChips.length > 1 ? (
-                <Toolbar label="Filter pages by status">
-                  <Button
-                    size="sm"
-                    variant={statusFilter === null ? 'solid' : 'outline'}
+            <div className="creator-pages-toolbar">
+                <div className="creator-pages-filters" role="group" aria-label="Filter pages by status">
+                  <button
+                    type="button"
                     aria-pressed={statusFilter === null}
                     onClick={() => setStatusFilter(null)}
                   >
-                    All
-                  </Button>
+                    All pages
+                  </button>
                   {statusChips.map((status) => (
-                    <Button
+                    <button
                       key={status}
-                      size="sm"
-                      variant={statusFilter === status ? 'solid' : 'outline'}
+                      type="button"
                       aria-pressed={statusFilter === status}
                       onClick={() => setStatusFilter(status)}
                     >
-                      {status}
-                    </Button>
+                      {status[0]?.toUpperCase()}{status.slice(1)}
+                    </button>
                   ))}
-                </Toolbar>
-              ) : null}
-              <div className="ml-auto text-right">
-                <p className="eyebrow">{meta.total} {meta.total === 1 ? 'page' : 'pages'}</p>
-                <p className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-faint">
+                </div>
+              <div className="creator-pages-count">
+                <strong>{meta.total} {meta.total === 1 ? 'page' : 'pages'}</strong><span aria-hidden="true"> · </span>
+                <span>
                   {statusFilter === null
                     ? meta.total === 0
                       ? 'No results'
@@ -173,50 +166,27 @@ export function PageListRoute() {
                     : meta.totalPages === 1
                       ? `${visiblePages?.length ?? 0} of ${meta.total}`
                       : `${visiblePages?.length ?? 0} of ${pages?.length ?? 0} loaded`}
-                </p>
+                </span>
               </div>
             </div>
           ) : null}
           {meta && statusFilter !== null && visiblePages?.length === 0 ? (
-            <p className="mt-4 border border-rule bg-white/60 px-5 py-6 text-sm leading-relaxed text-ink-soft">
+            <p className="creator-notice mb-5">
               {meta.totalPages === 1
                 ? `No ${statusFilter} pages here.`
                 : `No ${statusFilter} pages among the ${pages?.length ?? 0} loaded — move through the pages below to check the rest.`}
             </p>
           ) : null}
-          <div className="mt-4 grid gap-3">
-            {visiblePages?.map((page, index) => (
-              <article key={page.id} className="grid gap-4 border border-rule bg-white/80 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:p-5" style={{ animationDelay: `${Math.min(index, 7) * 45}ms` }}>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <h2 className="font-display text-2xl font-medium leading-tight">
-                      <Link to={`/app/pages/${encodeURIComponent(page.id)}`} className="decoration-1 underline-offset-4 hover:underline">
-                        {page.title?.trim() || page.slug}
-                      </Link>
-                    </h2>
-                    <span className={`stamp ${page.status === 'published' ? '' : 'text-ink-faint'}`}>{page.status}</span>
-                    {page.moderationStatus !== 'visible' ? <span className="stamp text-danger">{page.moderationStatus.replace('_', ' ')}</span> : null}
-                    {page.unpublishedChanges ? <span className="eyebrow">Unpublished edits</span> : null}
-                  </div>
-                  <p className="mt-2 truncate font-mono text-xs text-ink-soft">/{page.slug}</p>
-                  <p className="mt-2 text-xs text-ink-faint">Updated {formatRelative(page.updatedAt)}</p>
-                </div>
-                <div className="flex items-center gap-4 sm:justify-end">
-                  {page.status === 'published' ? (
-                    <a href={publicPagePath(page.slug)} target="_blank" rel="noreferrer" className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] underline underline-offset-4">View live</a>
-                  ) : null}
-                  <button type="button" onClick={() => { setDeleteError(null); setDeleting(page) }} className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-danger underline underline-offset-4">
-                    Delete
-                  </button>
-                </div>
-              </article>
+          <div className="creator-pages-grid">
+            {visiblePages?.map((page) => (
+              <PageCard key={page.id} page={page} onDelete={() => { setDeleteError(null); setDeleting(page) }} />
             ))}
           </div>
           {meta && meta.totalPages > 1 ? (
-            <nav aria-label="Page list pagination" className="mt-6 flex items-center justify-between">
-              <Button variant="outline" disabled={meta.page <= 1} onClick={() => changePage(meta.page - 1)}>Previous</Button>
-              <p className="font-mono text-xs tabular-nums">Page {meta.page} of {meta.totalPages}</p>
-              <Button variant="outline" disabled={meta.page >= meta.totalPages} onClick={() => changePage(meta.page + 1)}>Next</Button>
+            <nav aria-label="Page list pagination" className="creator-pages-pagination">
+              <button type="button" className="creator-button" disabled={meta.page <= 1} onClick={() => changePage(meta.page - 1)}>Previous</button>
+              <p>Page {meta.page} of {meta.totalPages}</p>
+              <button type="button" className="creator-button" disabled={meta.page >= meta.totalPages} onClick={() => changePage(meta.page + 1)}>Next</button>
             </nav>
           ) : null}
         </>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { ArrowDown, ArrowUp, ArrowUpRight, CheckCircle, ClockCounterClockwise, Eye, EyeSlash, FloppyDisk, Info, LinkSimple, Palette, PencilSimple, Plus, RocketLaunch, Trash, UserCircle, X } from '@phosphor-icons/react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../../components/Button'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -23,6 +24,7 @@ import type { MediaAsset } from '../media/types'
 import { QrCodeTools } from './QrCodeTools'
 import { checkSlugAvailability, deletePage, discardPageDraft, fetchPageLinkMetadata, getPage, getPageDraft, getPagePreview, getPageRevision, listPageLinks, listPageRevisions, publicPagePath, publishPage, restorePageRevision, savePageDraft, slugReasonMessage, unpublishPage, updatePage } from './api'
 import { PageRenderer } from './PageRenderer'
+import { PublishedPageLink } from './PublishedPageLink'
 
 interface PageValues {
   title: string
@@ -400,7 +402,8 @@ export function PageEditorRoute() {
     JSON.stringify(draftContentFor(detail, pageValues, groups)) !== JSON.stringify(draft.content)
   const linkDirty = linkOpen && JSON.stringify(linkValues) !== JSON.stringify(linkBaseline)
   const accountUnsaved = photo !== null || photoBusy || socialState.dirty || socialState.pending
-  const navigation = useUnsavedChanges(Boolean(pageDirty || draftDirty || linkDirty || draftStatus === 'error' || accountUnsaved))
+  const groupDirty = groupName.trim().length > 0
+  const navigation = useUnsavedChanges(Boolean(pageDirty || draftDirty || linkDirty || groupDirty || draftStatus === 'error' || accountUnsaved))
 
   useEffect(() => {
     if (!draftReady || !draft || !detail || draftDirty || draftStatus !== 'saved') return
@@ -559,7 +562,7 @@ export function PageEditorRoute() {
     const endChanged = !editingLink || linkValues.endsAt !== linkBaseline.endsAt
     const start = startChanged ? epochFromLocal(linkValues.startsAt) : editingLink?.startsAt ?? null
     const end = endChanged ? epochFromLocal(linkValues.endsAt) : editingLink?.endsAt ?? null
-    if (start !== null && end !== null && start > end) {
+    if (start !== null && end !== null && start >= end) {
       setLinkError(new ApiError(400, 'BAD_REQUEST', 'The end time must be after the start time.'))
       return
     }
@@ -744,7 +747,7 @@ export function PageEditorRoute() {
   }
 
   const changePublication = async (action: 'publish' | 'unpublish', publishLastSaved = false) => {
-    if (!detail || linkDirty || accountUnsaved || slugValue.trim().toLowerCase() !== detail.page.slug.toLowerCase()) return
+    if (!detail || linkDirty || groupDirty || accountUnsaved || slugValue.trim().toLowerCase() !== detail.page.slug.toLowerCase()) return
     if (action === 'publish' && draftDirty && draftStatus === 'error' && !publishLastSaved) {
       setPublishSavedDraftOpen(true)
       return
@@ -906,11 +909,10 @@ export function PageEditorRoute() {
     } : current)
   }
   const renderLinkRows = (rows: typeof linkRows) => rows.map(({ link, index }) => (
-    <li key={link.id} className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 border-b border-rule py-4 last:border-b-0">
+    <li key={link.id} className="creator-editor-link-row grid grid-cols-[auto_minmax(0,1fr)] gap-3 border-b border-rule py-4 last:border-b-0">
       <div className="flex flex-col items-center gap-1">
-        <span aria-hidden="true" className="font-mono text-xs tracking-[-.2em] text-ink-faint">⠿</span>
-        <button type="button" aria-label={`Move ${link.title} up`} disabled={index === 0 || actionPending !== null} onClick={() => void moveLink(index, -1)} className="px-2 py-1 font-mono text-xs disabled:opacity-30">↑</button>
-        <button type="button" aria-label={`Move ${link.title} down`} disabled={index === (detail?.links.length ?? 0) - 1 || actionPending !== null} onClick={() => void moveLink(index, 1)} className="px-2 py-1 font-mono text-xs disabled:opacity-30">↓</button>
+        <button type="button" aria-label={`Move ${link.title} up`} title="Move up" disabled={index === 0 || actionPending !== null} onClick={() => void moveLink(index, -1)} className="creator-icon-button"><ArrowUp size={17} /></button>
+        <button type="button" aria-label={`Move ${link.title} down`} title="Move down" disabled={index === (detail?.links.length ?? 0) - 1 || actionPending !== null} onClick={() => void moveLink(index, 1)} className="creator-icon-button"><ArrowDown size={17} /></button>
       </div>
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
@@ -919,7 +921,10 @@ export function PageEditorRoute() {
               type="checkbox"
               aria-label={`Select ${link.title}`}
               checked={selectedLinkIds.includes(link.id)}
-              onChange={(event) => setSelectedLinkIds((current) => event.currentTarget.checked ? [...current, link.id] : current.filter((value) => value !== link.id))}
+              onChange={(event) => {
+                const checked = event.currentTarget.checked
+                setSelectedLinkIds(current => checked ? current.includes(link.id) ? current : [...current, link.id] : current.filter(value => value !== link.id))
+              }}
               className="accent-black"
             />
             <h3 className="font-medium">{link.title}</h3>
@@ -931,11 +936,11 @@ export function PageEditorRoute() {
           {link.description ? <p className="mt-1 text-sm text-ink-faint">{link.description}</p> : null}
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" aria-pressed={link.isVisible} aria-label={`${link.isVisible ? 'Hide' : 'Show'} ${link.title}`} onClick={() => toggleVisibility(link.id)} className="font-mono text-[0.625rem] uppercase tracking-widest underline underline-offset-4">
-            {link.isVisible ? '◉ Visible' : '○ Hidden'}
+          <button type="button" aria-pressed={link.isVisible} aria-label={`${link.isVisible ? 'Hide' : 'Show'} ${link.title}`} title={link.isVisible ? 'Hide link' : 'Show link'} onClick={() => toggleVisibility(link.id)} className="creator-icon-button">
+            {link.isVisible ? <Eye size={18} /> : <EyeSlash size={18} />}
           </button>
-          <button type="button" onClick={() => startEditLink(link)} className="font-mono text-[0.625rem] uppercase tracking-[0.12em] underline underline-offset-4">Edit</button>
-          <button type="button" onClick={() => { setDeleteError(null); setDeletingLink(link) }} className="font-mono text-[0.625rem] uppercase tracking-[0.12em] text-danger underline underline-offset-4">Remove</button>
+          <button type="button" aria-label={`Edit ${link.title}`} title="Edit link" onClick={() => startEditLink(link)} className="creator-icon-button"><PencilSimple size={18} /></button>
+          <button type="button" aria-label={`Remove ${link.title}`} title="Remove link" onClick={() => { setDeleteError(null); setDeletingLink(link) }} className="creator-icon-button creator-editor-remove"><Trash size={18} /></button>
         </div>
       </div>
     </li>
@@ -955,7 +960,7 @@ export function PageEditorRoute() {
   }
 
   if (!pageValues) return <Splash label="Preparing the editor" />
-  const hasUnsaved = Boolean(pageDirty || draftDirty || linkDirty || accountUnsaved || draftStatus !== 'saved')
+  const hasUnsaved = Boolean(pageDirty || draftDirty || linkDirty || groupDirty || accountUnsaved || draftStatus !== 'saved')
   const owner = previewOwner ?? serverPreview?.owner
   const ownsProfile = Boolean(owner && owner.username === session.user?.username)
   const accountReadable = Boolean(ownsProfile && session.user?.status === 'active' && !session.mustChangePassword)
@@ -972,10 +977,10 @@ export function PageEditorRoute() {
   } : owner
   const livePreview = liveOwner ? draftModel(detail.page.slug, draftContentFor(detail, pageValues, groups), liveOwner) : null
   const editorActions = <>
-    <span className="creator-editor-save-state" data-unsaved={hasUnsaved} role="status">{draftStatus === 'error' ? 'Save needs attention' : draftStatus === 'saving' ? 'Saving…' : hasUnsaved ? 'Unsaved changes' : 'All changes saved'}</span>
-    <button type="button" className="creator-button" disabled={draftStatus === 'saving' || Boolean(draftConflict)} onClick={() => setDraftRetry(value => value + 1)}>Save draft</button>
-    <button type="button" className="creator-button" onClick={() => { setTab('publish'); void openRevisionHistory() }}>History</button>
-    <button type="button" className="creator-button creator-button-primary" disabled={hasUnsaved || actionPending !== null || detail.page.moderationStatus !== 'visible' || (detail.page.status === 'published' && !draft?.unpublishedChanges)} onClick={() => void changePublication('publish')}>{actionPending === 'publish' ? 'Publishing…' : 'Publish'}</button>
+    <span className="creator-editor-save-state" data-unsaved={hasUnsaved} role="status"><CheckCircle size={15} />{draftStatus === 'error' ? 'Save needs attention' : draftStatus === 'saving' ? 'Saving…' : hasUnsaved ? 'Unsaved changes' : 'All changes saved'}</span>
+    <button type="button" className="creator-button" disabled={draftStatus === 'saving' || Boolean(draftConflict)} onClick={() => setDraftRetry(value => value + 1)}><FloppyDisk size={17} />Save draft</button>
+    <button type="button" className="creator-button" onClick={() => { setTab('publish'); void openRevisionHistory() }}><ClockCounterClockwise size={17} />History</button>
+    <button type="button" className="creator-button creator-button-primary" disabled={hasUnsaved || actionPending !== null || detail.page.moderationStatus !== 'visible' || (detail.page.status === 'published' && !draft?.unpublishedChanges)} onClick={() => void changePublication('publish')}><RocketLaunch size={17} />{actionPending === 'publish' ? 'Publishing…' : 'Publish'}</button>
   </>
   const publicUrl = new URL(publicPagePath(detail.page.slug), window.location.origin).href
   const revisionPreview = revisionDetail ? {
@@ -1005,7 +1010,7 @@ export function PageEditorRoute() {
         </div>
         <span className={`creator-badge ${draft?.unpublishedChanges || detail.page.status !== 'published' ? 'creator-badge-private' : 'creator-badge-live'}`}>{draft?.unpublishedChanges ? 'Unpublished changes' : detail.page.status === 'published' ? 'Page live' : 'Draft · private'}</span>
       </div>
-      <div className="creator-notice">Page edits autosave to your private draft. Publish when you’re ready to update your page. <Link to="/app/pages" className="creator-muted-link">My pages →</Link></div>
+      <div className="creator-notice"><Info size={18} />Page edits autosave to your private draft. Publish when you’re ready to update your page. <Link to="/app/pages" className="creator-muted-link">My pages <ArrowUpRight size={14} /></Link></div>
 
       {shareMessage ? <p role="status" className="mt-3 text-sm text-ink-soft">{shareMessage}</p> : null}
       {shareError ? <p role="alert" className="mt-3 text-sm text-danger">{shareError}</p> : null}
@@ -1041,12 +1046,12 @@ export function PageEditorRoute() {
               const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : null
               const nextTab = next === null ? undefined : tabs[next]
               if (nextTab) { event.preventDefault(); setTab(nextTab); document.getElementById(`editor-tab-${nextTab}`)?.focus() }
-            }}>{value === 'publish' ? 'Publishing' : value.charAt(0).toUpperCase() + value.slice(1)}</button>)}
+            }}>{value === 'profile' ? <UserCircle size={19} /> : value === 'links' ? <LinkSimple size={19} /> : value === 'design' ? <Palette size={19} /> : <RocketLaunch size={19} />}<span>{value === 'publish' ? 'Publishing' : value.charAt(0).toUpperCase() + value.slice(1)}</span></button>)}
           </div>
           <div role="tabpanel" id="editor-panel-profile" aria-labelledby="editor-tab-profile" hidden={tab !== 'profile'}>
             <section className="creator-editor-panel">
-              <h2>Profile details</h2><p>Make a great first impression. Your preview updates as you type.</p>
-              {ownsProfile && session.user ? <ProfilePhotoEditor user={session.user} readable={accountReadable} writable={accountWritable} onBusyChange={setPhotoBusy} onPreviewChange={setPhoto} /> : <p>{owner ? `Profile photo and socials belong to @${owner.username}. Only the owner can edit them.` : 'Loading profile details…'}</p>}
+              <div className="creator-editor-card-heading"><h2><UserCircle size={21} />Profile details</h2><span className="creator-badge">Your identity</span></div><p>Make a great first impression. Your preview updates as you type.</p>
+              {ownsProfile && session.user ? <ProfilePhotoEditor compact user={session.user} readable={accountReadable} writable={accountWritable} onBusyChange={setPhotoBusy} onPreviewChange={setPhoto} /> : <p>{owner ? `Profile photo and socials belong to @${owner.username}. Only the owner can edit them.` : 'Loading profile details…'}</p>}
               <form onSubmit={event => void savePage(event)} className="creator-editor-fields">
                 <div className="creator-editor-identity-fields">
                   <Field label="Page display name" maxLength={120} value={pageValues.title} onChange={event => updatePageValue('title', event.currentTarget.value)} hint="Leave blank to use your account display name." />
@@ -1069,18 +1074,18 @@ export function PageEditorRoute() {
               </form>
             </section>
             {ownsProfile ? <section className="creator-editor-panel">
-              <SocialsEditor readable={accountReadable} writable={accountWritable} blockedReason="Your account must be active to edit social profiles." onPreviewChange={setSocialPreview} onStateChange={setSocialState} />
+              <SocialsEditor compact readable={accountReadable} writable={accountWritable} blockedReason="Your account must be active to edit social profiles." onPreviewChange={setSocialPreview} onStateChange={setSocialState} />
               <p className="creator-editor-account-note">Photo and social changes save to your account immediately and appear across all your pages.</p>
             </section> : null}
           </div>
           <section role="tabpanel" id="editor-panel-design" aria-labelledby="editor-tab-design" hidden={tab !== 'design'} className="creator-editor-panel space-y-5">
-            <div><h2 id="appearance-heading">Page design</h2><p className="creator-muted">Give your page a look that feels like you.</p></div>
+            <div className="creator-editor-card-heading"><h2 id="appearance-heading"><Palette size={21} />Page design</h2></div><p className="creator-muted">Give your page a look that feels like you.</p>
             <div className="grid gap-6 sm:grid-cols-2">
               <SelectField
                 label="Theme"
                 value={pageValues.theme}
                 onChange={(event) => updatePageValue('theme', event.currentTarget.value === 'dark' ? 'dark' : 'light')}
-                options={[{ value: 'light', label: 'Light paper' }, { value: 'dark', label: 'Dark ink' }]}
+                options={[{ value: 'light', label: 'Black with cyan glow' }, { value: 'dark', label: 'Solid black' }]}
               />
               <SelectField
                 label="Link layout"
@@ -1099,8 +1104,8 @@ export function PageEditorRoute() {
 
           <section role="tabpanel" id="editor-panel-links" aria-labelledby="editor-tab-links" hidden={tab !== 'links'} className="creator-editor-panel">
             <div className="flex flex-wrap items-end justify-between gap-4 border-b border-rule pb-3">
-              <div><p className="eyebrow">02 · Destinations</p><h2 id="links-heading" className="mt-1 font-display text-2xl">Your links</h2></div>
-              <Button variant="outline" onClick={startNewLink}>Add a link</Button>
+              <div><h2 id="links-heading" className="creator-editor-icon-heading"><LinkSimple size={21} />Your links</h2><p className="creator-muted mt-2">Give your visitors somewhere to go.</p></div>
+              <Button variant="outline" onClick={startNewLink}><Plus size={17} />Add a link</Button>
             </div>
             <div className="mt-5 border-y border-rule py-4">
               <p className="eyebrow">Link groups</p>
@@ -1116,10 +1121,10 @@ export function PageEditorRoute() {
                   {groups.map((group, index) => (
                     <li key={group.id} className="flex items-center gap-2 border border-rule px-3 py-2 text-xs">
                       <span>{group.name}</span>
-                      <button type="button" aria-label={`Move ${group.name} up`} disabled={index === 0} onClick={() => moveGroup(index, -1)} className="disabled:opacity-30">↑</button>
-                      <button type="button" aria-label={`Move ${group.name} down`} disabled={index === groups.length - 1} onClick={() => moveGroup(index, 1)} className="disabled:opacity-30">↓</button>
-                      <button type="button" aria-label={`Rename ${group.name}`} onClick={() => { setEditingGroup(group); setGroupName(group.name) }} className="underline underline-offset-4">Rename</button>
-                      <button type="button" aria-label={`Delete ${group.name}`} onClick={() => setDeletingGroup(group)} className="text-danger underline underline-offset-4">Delete</button>
+                      <button type="button" aria-label={`Move ${group.name} up`} title="Move group up" disabled={index === 0} onClick={() => moveGroup(index, -1)} className="creator-icon-button"><ArrowUp size={16} /></button>
+                      <button type="button" aria-label={`Move ${group.name} down`} title="Move group down" disabled={index === groups.length - 1} onClick={() => moveGroup(index, 1)} className="creator-icon-button"><ArrowDown size={16} /></button>
+                      <button type="button" aria-label={`Rename ${group.name}`} title="Rename group" onClick={() => { setEditingGroup(group); setGroupName(group.name) }} className="creator-icon-button"><PencilSimple size={16} /></button>
+                      <button type="button" aria-label={`Delete ${group.name}`} title="Delete group" onClick={() => setDeletingGroup(group)} className="creator-icon-button creator-editor-remove"><Trash size={16} /></button>
                     </li>
                   ))}
                 </ul>
@@ -1137,12 +1142,12 @@ export function PageEditorRoute() {
                   {group.name}
                 </button>
               ))}
-              <Button type="button" variant="outline" onClick={() => document.getElementById('new-group')?.focus()}>＋ Group</Button>
+              <Button type="button" variant="outline" onClick={() => document.getElementById('new-group')?.focus()}><Plus size={16} />Group</Button>
             </div>
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
               <div className="flex gap-2" role="group" aria-label="Link list">
-                <Button type="button" variant={listTrash ? 'outline' : undefined} onClick={() => setListTrash(false)}>Active links</Button>
-                <Button type="button" variant={listTrash ? undefined : 'outline'} onClick={() => setListTrash(true)}>Recently removed</Button>
+                <Button type="button" variant={listTrash ? 'outline' : undefined} onClick={() => setListTrash(false)}><Eye size={17} />Active links</Button>
+                <Button type="button" variant={listTrash ? undefined : 'outline'} onClick={() => setListTrash(true)}><Trash size={17} />Recently removed</Button>
               </div>
               {!listTrash && selectedLinkIds.length > 0 ? (
                 <div className="flex flex-wrap items-center gap-2">
@@ -1196,7 +1201,7 @@ export function PageEditorRoute() {
               {linkOpen ? <form onSubmit={(event) => void saveLink(event)} className="p-5 sm:p-7">
                 <div className="flex items-start justify-between gap-4">
                   <div><p className="eyebrow">{editingLink ? 'Edit destination' : 'New destination'}</p><h3 id="link-dialog-title" className="mt-1 font-display text-2xl">{editingLink ? 'Tune this link' : 'Add Link'}</h3></div>
-                  <button type="button" aria-label="Close link editor" onClick={closeLinkForm} className="min-h-10 min-w-10 border border-rule font-mono text-lg">×</button>
+                  <button type="button" aria-label="Close link editor" onClick={closeLinkForm} className="creator-icon-button"><X size={20} /></button>
                 </div>
                 {linkError ? <p role="alert" className="mt-4 text-sm text-danger">{errorMessageFor(linkError)}</p> : null}
                 <div className="mt-5 grid gap-5">
@@ -1272,13 +1277,9 @@ export function PageEditorRoute() {
           </section>
 
           <section role="tabpanel" id="editor-panel-publish" aria-labelledby="editor-tab-publish" hidden={tab !== 'publish'} className="creator-editor-panel">
-            <p className="eyebrow">03 · Release</p>
-            <h2 id="publish-heading" className="mt-1 font-display text-2xl">Publication</h2>
+            <h2 id="publish-heading" className="creator-editor-icon-heading"><RocketLaunch size={21} />Publication</h2>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-soft">
               {hasUnsaved ? 'Your latest edits are still saving. Wait for autosave before publishing.' : 'Publishing replaces the live page with your saved draft.'}
-            </p>
-            <p role="status" className="mt-2 font-mono text-[0.625rem] uppercase tracking-[0.12em] text-ink-faint">
-              {draftStatus === 'saving' ? 'Autosaving…' : draftDirty ? 'Unsaved changes' : 'All changes saved'}
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-4">
               {detail.page.status === 'published' ? (
@@ -1295,10 +1296,11 @@ export function PageEditorRoute() {
               {draft?.unpublishedChanges ? (
                 <Button type="button" variant="outline" disabled={draftDirty || draftStatus !== 'saved' || draftActionPending} onClick={() => setDiscardDraftOpen(true)}>Discard draft</Button>
               ) : null}
-              <Button type="button" variant="outline" onClick={() => void openRevisionHistory()}>Version history</Button>
+              <Button type="button" variant="outline" onClick={() => void openRevisionHistory()}><ClockCounterClockwise size={17} />Version history</Button>
               {detail.page.status === 'published' ? <Button type="button" variant="outline" onClick={() => void sharePublicPage()}>Share page</Button> : null}
               <Link className="creator-button" to={`/app/share?page=${id}`}>Share &amp; QR</Link>
-              <Button type="button" variant="outline" onClick={() => setDeletingPage(true)}>Delete page</Button>
+              {detail.page.status === 'published' && detail.page.moderationStatus === 'visible' ? <PublishedPageLink slug={detail.page.slug} className="creator-button"><ArrowUpRight size={17} />View live</PublishedPageLink> : null}
+              <Button type="button" variant="outline" onClick={() => setDeletingPage(true)}><Trash size={17} />Delete page</Button>
               {detail.page.publishedAt ? <span className="font-mono text-[0.625rem] uppercase tracking-widest text-ink-faint">Published {new Date(detail.page.publishedAt).toLocaleString()}</span> : null}
             </div>
             {qrOpen && detail.page.status === 'published' ? <div className="mt-4"><Button type="button" variant="outline" onClick={() => setQrOpen(false)}>Close QR tools</Button><QrCodeTools url={publicUrl} name={detail.page.slug} /></div> : null}
@@ -1392,6 +1394,7 @@ export function PageEditorRoute() {
         onCancel={navigation.stay}
       >
         {linkDirty ? <p>A link form that has not been added will be lost.</p> : null}
+        {groupDirty ? <p>Your unfinished group name has not been saved.</p> : null}
         {accountUnsaved ? <p>Finish or discard your photo and social edits before leaving to keep those changes.</p> : null}
         {slugValue.trim().toLowerCase() !== detail.page.slug.toLowerCase() ? <p>Your page address change has not been confirmed.</p> : null}
         {draftStatus === 'error'

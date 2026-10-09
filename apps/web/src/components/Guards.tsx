@@ -37,7 +37,8 @@ export function RequireAuth() {
     const next = encodeURIComponent(`${location.pathname}${location.search}`)
     return <Navigate to={`/login?next=${next}`} replace />
   }
-  const accountDestination = ['/app', '/app/dashboard', '/app/profile'].includes(location.pathname)
+  const accountDestination = ['/app', '/app/dashboard', '/app/profile', '/app/settings'].includes(location.pathname)
+    || location.pathname.startsWith('/app/settings/')
   if (session.mustChangePassword && !accountDestination) {
     return <Navigate to="/app" replace />
   }

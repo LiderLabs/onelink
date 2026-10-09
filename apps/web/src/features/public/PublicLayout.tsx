@@ -1,4 +1,5 @@
-import { Link, Outlet } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
+import { ArrowLeft, ArrowUpRight } from '@phosphor-icons/react'
 import { useSession } from '../../lib/session'
 
 // ============================================================================
@@ -7,41 +8,43 @@ import { useSession } from '../../lib/session'
 // A layout of its own, not `AppShell` minus a few parts. A public page is read by
 // an anonymous browser, so it carries none of the session-scoped chrome: no
 // suspension notice, no maintenance banner, no masthead with a username in it,
-// no console navigation. Building it by hiding things inside the console shell
+// no console shell. Building it by hiding things inside the console shell
 // would make "nothing leaked" a property of the hiding rather than of the layout.
 //
 // No guard either: this renders for a signed-out visitor and a signed-in one
-// alike, and the session is read only for the platform name in the footer.
+// alike. A workspace visit retains a return shortcut; anonymous visitors see
+// no account navigation or private account details.
 // ============================================================================
 
 export function PublicLayout() {
-  const { platformName } = useSession()
+  const { platformName, status } = useSession()
+  const location = useLocation()
+  const previous = (location.state as { publicPageReturnTo?: unknown } | null)?.publicPageReturnTo
+  const returnTo = typeof previous === 'string' && /^\/app\/(?:pages|dashboard|share|onboarding|links|editor)(?:[/?#]|$)/.test(previous)
+    ? previous : status === 'authenticated' ? '/app/pages' : null
+  const returnLabel = returnTo?.startsWith('/app/pages/') || returnTo?.startsWith('/app/editor') ? 'Back to page editor'
+    : returnTo?.startsWith('/app/dashboard') ? 'Back to dashboard'
+    : returnTo?.startsWith('/app/share') ? 'Back to Share & QR'
+    : returnTo?.startsWith('/app/onboarding') ? 'Back to setup'
+    : returnTo?.startsWith('/app/links') ? 'Back to my links' : 'Back to my pages'
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="public-layout flex flex-col">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-ink focus:px-3 focus:py-2 focus:font-mono focus:text-xs focus:uppercase focus:text-paper"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-[#00d8ef] focus:px-3 focus:py-2 focus:text-sm focus:text-black"
       >
         Skip to content
       </a>
 
-      <main id="main" className="mx-auto w-full max-w-2xl flex-1 px-5 py-16 sm:py-20">
+      {returnTo ? <div className="public-return-bar"><Link className="public-return-link" to={returnTo}><ArrowLeft size={17} />{returnLabel}</Link><span>Public page</span></div> : null}
+
+      <main id="main" className="public-page-main">
         <Outlet />
       </main>
 
-      <footer className="border-t border-rule">
-        <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center justify-between gap-3 px-5 py-4">
-          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-ink-faint">
-            {platformName}
-          </p>
-          <Link
-            to="/login"
-            className="border-b border-transparent font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-ink-soft transition-colors hover:border-ink hover:text-ink"
-          >
-            Sign in
-          </Link>
-        </div>
+      <footer className="public-page-footer">
+        <Link to="/login">Sign in to {platformName} <ArrowUpRight size={15} aria-hidden="true" /></Link>
       </footer>
     </div>
   )
