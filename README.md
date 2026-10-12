@@ -4,13 +4,16 @@
 
 OneLink is a link-in-bio platform for creators and businesses. It brings a profile, social accounts, and important destinations together on a shareable public page.
 
-This repository contains the public website, the creator workspace, and the API. Creators can sign up, complete onboarding, edit their page, publish it, and share its address or QR code. The backend also provides administration, moderation, and page collaboration APIs.
+This repository contains the public website, creator workspace, admin workspace, and API. Creators can sign up, complete onboarding, edit their page, publish it, and share its address or QR code. Staff can manage accounts, review reports and appeals, update platform settings, and inspect audit records.
+
+For backend integration, start with [Backend developer handoff](#backend-developer-handoff). It documents the latest admin work, the existing API contracts it consumes, and the remaining integration work.
 
 ## Contents
 
 - [Technology stack](#technology-stack)
 - [Implemented features](#implemented-features)
 - [User journeys](#user-journeys)
+- [Backend developer handoff](#backend-developer-handoff)
 - [Project structure](#project-structure)
 - [How data and publishing work](#how-data-and-publishing-work)
 - [Local development](#local-development)
@@ -26,7 +29,7 @@ This repository contains the public website, the creator workspace, and the API.
 
 | Area | Technology | Purpose |
 | --- | --- | --- |
-| Frontend | React 19 + TypeScript | Public website and creator screens |
+| Frontend | React 19 + TypeScript | Public website, creator screens, and admin workspace |
 | Routing | React Router 7 | Authentication guards, page navigation, and unsaved-change protection |
 | Frontend tooling | Vite 8 | Development server and production builds |
 | Styling | Tailwind CSS 4 + feature CSS | Responsive layouts, cyan accents, and dark workspace themes |
@@ -126,7 +129,24 @@ The analytics interface includes time-range controls, activity charts, traffic s
 
 The current frontend does **not** send visitor events or request real analytics reports. The API already has event-ingestion and page-report endpoints, but connecting them to the public renderer and analytics screen remains to be done. Your data therefore shows an unavailable state rather than invented metrics.
 
-### Backend capabilities beyond the creator UI
+### Admin workspace
+
+Staff sign-in opens `/admin`. Staff can also open **Admin** from the creator header's account menu. The workspace uses the shared OneLink logo, cyan accents, a sticky header, a collapsible desktop sidebar, and mobile navigation.
+
+| Screen | Implemented behavior |
+| --- | --- |
+| Overview | Current user/active-account totals, open and reviewing report counts, recent users, and recent audit activity from the API |
+| Users | Server search, role/status filters, sorting, pagination, clickable rows and View buttons for account details, creation, profile edits, notes, sessions, and confirmed warnings/suspensions/bans/reactivation/deletion |
+| Reports | Queue filters, stored evidence, public-page link, assignment, dismissal/resolution, account warnings/bans, and whole-page removal with confirmation |
+| Appeals | Review appeal and sanction details; uphold, overturn, or reduce eligible suspensions with recorded reasons |
+| System settings | Typed controls for existing platform policies, registration availability, serialized autosave, save errors/retry, and unsaved-navigation protection |
+| Audit log | Search and action/status/date filters, event details, and CSV export of all matching pages within the configured export limit |
+
+Access follows the API's `owner`, `admin`, `moderator`, `support`, and `user` roles and capability grants. Only owners can change platform policies and assign roles. The API enforces account rank and last-active-owner protection. Creator accounts are redirected out of `/admin`; password-change restrictions remain enforced.
+
+The UI does not claim an invitation email was sent when creating accounts. Impersonation, email-template editing, and rate-limit-rule editing remain unavailable because the current API exposes no endpoints for them. Content removal takes the **entire page** offline; staff have no endpoint for removing a single reported link. Reports with no matching owner account keep account sanctions unavailable.
+
+### Additional backend capabilities
 
 - Role and capability checks for `owner`, `admin`, `moderator`, `support`, and `user` accounts.
 - Staff user management, warnings, suspensions, bans/reactivation, notes, password-reset requests, and session revocation.
@@ -136,7 +156,7 @@ The current frontend does **not** send visitor events or request real analytics 
 - Analytics event storage and page summaries for 7, 30, or 90 days.
 - Daily maintenance for expired sanctions, retained audit/analytics data, media cleanup, and removed links.
 
-These APIs exist in the backend. Dedicated staff, team-invitation, and moderation screens are not wired into the current frontend route table.
+Team-invitation, private moderation-evidence uploads, content-flag management, and real creator analytics are not wired into dedicated frontend screens yet.
 
 ## User journeys
 
@@ -145,6 +165,59 @@ These APIs exist in the backend. Dedicated staff, team-invitation, and moderatio
 **Returning creator:** Sign in → Creator dashboard. If setup is incomplete, `/app` sends the creator back to onboarding. A required password change must be completed before protected editing actions become available.
 
 **Visitor:** Open a published page → View profile/socials → Follow its links. No account is required to view an available public page.
+
+**Staff:** Sign in → Admin overview → Users, Reports, Appeals, System Settings, or Audit Log → Return to Creator Dashboard or sign out. Accounts requiring a password change visit security settings first.
+
+## Backend developer handoff
+
+**Updated: 12 October 2026. Latest feature: the admin workspace.** This implementation added frontend screens and API clients; it did not change backend routes, schemas, migrations, or permission rules.
+
+The public landing page, authentication, creator dashboard, onboarding, profile/social editor, page editor, link manager, published pages, Share & QR, and account-settings sections are already built. Their behavior and storage are described under [Implemented features](#implemented-features). Real creator analytics and several account-settings actions remain unavailable; see the [remaining-work table](#current-limitations).
+
+### Latest admin delivery
+
+- Staff sign-in redirects to `/admin`; the creator avatar dropdown also provides an Admin entry.
+- Overview, Users, Reports, Appeals, System Settings, and Audit Log are mounted routes with loading, empty, error, and permission states.
+- Sensitive actions require confirmation and a reason. Pending dialogs prevent duplicate submissions and cannot be dismissed during the request.
+- Settings autosave serializes requests, keeps edits made during a save, and exposes failures with an explicit retry.
+- Audit CSV export reads every filtered page, enforces the export limit, escapes spreadsheet formulas, and cancels the download if reads fail or pagination changes.
+- The interface uses the current OneLink logo and cyan/dark colors, a sticky header, a collapsible desktop sidebar, and mobile navigation.
+
+### Admin API connections
+
+All paths below are relative to `/api/v1`. These endpoints already exist and are called by the frontend.
+
+| Frontend behavior | Existing requests |
+| --- | --- |
+| Overview totals and recent activity | `GET /admin/users`, `GET /admin/reports`, `GET /admin/audit-logs`; totals come from list metadata, with no fabricated growth metrics |
+| User directory, creation, and editing | `GET /admin/users` with `q`, `role`, `status`, `sort`, `includeDeleted`, `page`, `limit`; `GET /admin/users/:id`; `POST /admin/users`; `PATCH /admin/users/:id` |
+| User warnings, suspension, bans, and reactivation | `POST /admin/users/:id/warn`, `/suspend`, `/ban`, `/reactivate`; required `reason`, plus suspension duration/permanence where applicable |
+| User deletion, notes, and sessions | `DELETE /admin/users/:id?reason=...`; `GET`/`POST /admin/users/:id/notes`; `GET`/`DELETE /admin/users/:id/sessions` |
+| Reports queue and resolution | `GET /admin/reports` with status/category/pagination; `GET /admin/reports/:id`; `POST /admin/reports/:id/assign`; `POST /admin/reports/:id/resolve` with `status` and `notes` |
+| Reported content removal | `POST /admin/content/pages/:id/remove` with `reason` and `reportId`; removes the entire page, not a selected link |
+| Appeal review | `GET /admin/appeals` with status/pagination; `GET /admin/appeals/:id`; `POST /admin/appeals/:id/decision` with `decision`, `notes`, and `reducedDurationHours` for a reduction |
+| Platform settings | `GET /admin/settings`; `PATCH /admin/settings` with `{ settings: [{ key, value }] }`; existing keys only, with at most 100 changes per request |
+| Audit browsing and export | `GET /admin/audit-logs` with `q`, `action`, `status`, `from`, `to`, `page`, `limit`; `GET /admin/audit-logs/actions`; `GET /admin/audit-logs/:id`; CSV is generated in the browser |
+
+Frontend contracts: [users](apps/web/src/features/admin/users-api.ts), [moderation and appeals](apps/web/src/features/admin/moderation-api.ts), [settings](apps/web/src/features/admin/settings-api.ts), and [audit](apps/web/src/features/admin/audit-api.ts). Backend contracts: [user routes](apps/api/src/routes/users.ts), [moderation routes](apps/api/src/routes/moderation.ts), [settings routes](apps/api/src/routes/settings.ts), [audit routes](apps/api/src/routes/audit.ts), and [validation schemas](apps/api/src/validation).
+
+### Contract and integration notes
+
+- **Authentication:** The browser uses the existing HTTP-only session cookie and `credentials: include`. Login/current-session responses provide the user and capability grants; no admin token is stored in local storage.
+- **Access:** Role names remain `owner`, `admin`, `moderator`, `support`, and `user`. There is no `super_admin` role. Owner is the highest role and can edit platform policies and assign permitted roles. Backend capability, rank, self-action, and last-active-owner checks remain authoritative.
+- **Restricted sessions:** Required password changes route to `/app/settings/security` before admin access. Inactive, impersonated, and non-staff sessions cannot enter the admin workspace.
+- **Response shapes:** Single reads/writes use `{ data: ... }`; paginated lists use `{ data: [...], meta: { page, limit, total, totalPages } }`; errors use `{ error: { code, message, details } }`. Users/settings use camelCase DTOs; reports/appeals/audit use snake_case. Timestamps are epoch milliseconds.
+- **Settings reads:** The current settings endpoint returns all records in its data array even when metadata suggests multiple pages. The frontend consumes that array once; it does not paginate settings.
+- **Report identity:** Public-page links come from the stored page slug, not the account username. Reports without an owner ID use an exact, unique username match from the user directory; unresolved identities keep account sanctions unavailable. A stable owner user ID in report data would avoid this fallback.
+- **Moderation retries:** Warning/ban/page removal and report resolution are separate requests. If the action succeeds but resolution fails, the UI retains the completed action during SPA navigation and retries only resolution. This retry state is not durable across a full browser reload.
+- **User creation:** The frontend submits `requirePasswordChange: true`. It does not claim login instructions were emailed because no mail provider is connected.
+- **Creator publishing:** Draft changes stay private until publication; account photos/socials update separately. Preserve draft `updatedAt` conflict checks and profile write preconditions when extending the backend.
+
+### Review and verification
+
+The last feature verification on **12 October 2026** passed the production build/TypeScript checks, all four admin browser scripts, the landing/auth regression script, and **305 API tests across 17 test files**. Admin browser scripts intercept API responses; the API suite uses isolated Workers/D1/R2 test storage. These checks do not replace manual verification against the development database or a deployed environment.
+
+For manual review, sign in at `/login` using the seeded owner account, complete the required password change, then open `/admin`. Check creation/editing and suspension/reactivation using a disposable account, confirm report/appeal actions when queue entries exist, refresh after a settings save, and inspect/export the resulting audit records. Repeat with an ordinary creator to confirm `/admin` redirects to the creator dashboard. Setup and commands are below.
 
 ## Project structure
 
@@ -157,6 +230,7 @@ onelink/
 │   │   │   ├── App.tsx          Current frontend route table
 │   │   │   ├── components/     Shared branding, fields, dialogs, guards, and layouts
 │   │   │   ├── features/
+│   │   │   │   ├── admin/      Staff overview, users, reports, appeals, platform settings, and audit
 │   │   │   │   ├── auth/       Authentication styling
 │   │   │   │   ├── landing/    Landing page, platform hero, and animation hooks
 │   │   │   │   ├── creator/    Dashboard, onboarding, links, analytics, sharing, settings
@@ -250,7 +324,7 @@ To create a local staff owner account, also run:
 npm run db:seed:owner
 ```
 
-The owner seeder prints credentials and requires a password change after sign-in. Public registration can be used to create ordinary creator accounts.
+The owner seeder reads `OWNER_EMAIL` and `OWNER_PASSWORD` from the root `.dev.vars`, prints credentials, and requires a password change after sign-in. **Re-running it resets that owner's password to the configured value.** Use the current password if you have already changed it; seeding is not needed for every login. Public registration creates ordinary creator accounts.
 
 ### 3. Start both servers
 
@@ -296,6 +370,11 @@ npm run dev:web
 | `/app/profile`, `/profile` | Compatibility redirects to Profile settings |
 | `/app/socials` | Compatibility redirect to the socials section in Settings |
 | `/app/submissions` | Unavailable-feature placeholder |
+| `/admin` | Staff overview; permission-guarded |
+| `/admin/users` | User directory, account detail, and management actions |
+| `/admin/reports`, `/admin/appeals` | Moderation and appeal queues |
+| `/admin/settings` | Platform policies; owners can edit |
+| `/admin/audit` | Audit filters, event detail, and CSV export |
 | `/:slug`, `/p/:slug` | Public page |
 | Unmatched `/app/*` | Workspace not-found screen |
 
@@ -359,6 +438,15 @@ npm run browser:acceptance
 
 That suite intercepts API requests and does not mutate the local database. Additional scripts cover onboarding, navigation, page editing, links, analytics, sharing, photos, previews, and landing-page motion. Some use a real local test account and modify data; read their setup before running them. The landing checks and several creator checks launch installed Google Chrome.
 
+Admin checks also intercept all API requests and launch installed Google Chrome:
+
+```bash
+node scripts/browser/admin-entry-check.mjs
+node scripts/browser/admin-users-check.mjs
+node scripts/browser/admin-moderation-check.mjs
+node scripts/browser/admin-settings-audit-check.mjs
+```
+
 For older checks that export a function accepting a Playwright page, use the repository runner:
 
 ```bash
@@ -416,16 +504,23 @@ The Worker serves frontend deep links through SPA fallback, while `/api/*` alway
 
 These distinctions matter when evaluating the project or planning the next feature:
 
-| Feature | Current status |
-| --- | --- |
-| Real visitor analytics | Backend ingestion/reporting exists; public event collection and creator reporting are not connected |
-| Notification preferences | Settings screen exists; preference storage and delivery are unavailable |
-| Self-service account deletion | UI explains availability; deletion is disabled for creators. Staff user-deletion APIs exist |
-| Multi-device session management | Creator UI shows the current session only. Password changes invalidate other sessions; staff APIs can list/revoke sessions |
-| Email delivery | Templates and password-reset tokens exist, but no mail provider sends messages. Development returns reset tokens; production email reset delivery is incomplete |
-| Teams and staff tools | Backend APIs exist; dedicated frontend screens are not mounted |
-| Contact forms / submissions | No working submission collection or inbox; `/app/submissions` is a placeholder |
-| Custom domains and platform integrations | Custom-domain setup is not implemented. Landing-page platform cards illustrate supported destinations; they do not connect external services |
+This is the remaining-work list, not a claim that these features are implemented. It distinguishes missing backend support from existing APIs that still need frontend integration.
+
+| Feature | Current status | Remaining work |
+| --- | --- | --- |
+| Real visitor analytics | Backend ingestion/reporting exists; creator analytics uses labeled sample data | Connect public events to `POST /public/pages/:slug/events` and real reports to `GET /pages/:id/analytics`; backend endpoints already exist |
+| Notification preferences | Settings screen exists; preferences and delivery are unavailable | Add authenticated preference storage and delivery support, then connect the UI |
+| Self-service account deletion | Disabled for creators; staff user deletion is implemented | Add a self-service deletion contract and confirmation/re-authentication policy, then connect the creator screen |
+| Multi-device session management | Creator UI shows this session; staff can list/revoke other users' sessions | Add creator-facing list/revoke endpoints and controls; existing staff endpoints remain permission-guarded |
+| Email delivery | Templates/tokens exist; no provider sends messages | Connect a mail provider and password-reset delivery; define login-instruction delivery for staff-created accounts |
+| Teams | Membership/invitation APIs exist; dedicated screens are not mounted | Build frontend invitation/member management against the existing APIs |
+| Impersonation | Disabled; there is no supported API endpoint | Define authorized impersonation start/end, session handling, and auditing before connecting the UI |
+| Email-template and rate-limit-rule editing | Admin UI marks the separate editors unavailable | Expose authenticated CRUD contracts for the existing template/rule records; general settings autosave already works |
+| Individual reported-link removal | Staff can remove an entire page only | Add staff link-level moderation and auditing if selective removal is required |
+| Report owner identification | Frontend falls back to an exact username lookup when the snapshot lacks an owner ID | Return a stable owner user ID to make account actions independent of username changes |
+| Content flags and private evidence | Backend APIs exist; dedicated review/upload controls are not connected | Add frontend content-flag review and private report/appeal evidence workflows |
+| Contact forms / submissions | `/app/submissions` is a placeholder | Define collection/storage/inbox APIs and build the corresponding screens |
+| Custom domains and platform integrations | No custom-domain setup or external-account connections | Implement these separately; landing-page platform cards represent destinations, not authenticated integrations |
 
 ## Additional documentation
 

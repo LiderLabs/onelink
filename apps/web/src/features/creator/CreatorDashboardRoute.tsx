@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { ArrowRight, ArrowUpRight, CheckCircle, Circle, Copy, File, Link as LinkIcon, PencilSimple, Plus, ShareNetwork, SquaresFour } from '@phosphor-icons/react'
 import { ErrorNotice } from '../../components/ErrorNotice'
 import { Splash } from '../../components/StatusScreens'
@@ -13,6 +13,7 @@ import type { PageRenderModel } from '../pages/PageRenderer'
 import { getSetupPages, hasCompletedSetup } from './setup-state'
 
 export function CreatorDashboardRoute() {
+  const location = useLocation()
   const { user, mustChangePassword } = useSession()
   const restricted = !user || mustChangePassword || user.status !== 'active' || user.impersonatedBy !== null
   const [pages, setPages] = useState<OwnerPage[] | null>(null)
@@ -71,6 +72,7 @@ export function CreatorDashboardRoute() {
     { title: 'Publish your page', description: 'Bring your page to your audience', done: Boolean(live), href: complete ? `${editor}?tab=publish` : '/app/onboarding', action: 'Continue setup' },
   ]
   return <>
+    {location.state?.adminDenied && <p className="creator-notice mb-6" role="alert">You do not have permission to access the admin workspace.</p>}
     <header className="creator-heading"><div><p className="creator-eyebrow">Your dashboard</p><h1>{complete ? 'Welcome back' : 'Welcome'}, {user!.displayName.split(' ')[0]} <span aria-hidden="true">👋</span></h1><p>{complete ? 'Here’s what’s happening with your OneLink page today.' : 'Your creator space is ready. Let’s make your first page yours.'}</p></div><div className="creator-actions">{complete ? <><Link className="creator-button" to={editor}><PencilSimple size={18} />Edit Page</Link><Link className="creator-button creator-button-primary" to={`${manager}&add=1`}><Plus size={18} />Add Link</Link></> : <Link className="creator-button creator-button-primary" to="/app/onboarding">Continue setup<ArrowRight size={18} /></Link>}</div></header>
     {pages.length > 1 && <div className="creator-field mb-6" style={{ maxWidth: '24rem' }}><label htmlFor="dashboard-page">Your pages</label><select id="dashboard-page" value={selectedId ?? ''} onChange={event => { setSelectedId(event.target.value); setCopyStatus(null) }}>{pages.map(page => <option key={page.id} value={page.id}>{page.title || page.slug} · {page.status}</option>)}</select></div>}
     <section className="creator-card creator-address-card"><div><p className="creator-eyebrow">Your page address</p><h2>One link, all your important content.</h2><p>{live ? 'Share your personalized OneLink page with your audience. Customize it any time, then publish your updates.' : 'Finish setup and publish your page. Your draft stays private while you make it yours.'}</p></div><div className="creator-address-controls">{selected ? <><>{live ? <PublishedPageLink slug={selected.slug} className="creator-address">{address}</PublishedPageLink> : <span className="creator-address">{address}</span>}</><span className={`creator-badge ${live ? 'creator-badge-live' : 'creator-badge-private'}`}>{live ? 'Page live' : 'Not public'}</span>{live && <><button className="creator-button" onClick={() => void copy()}><Copy size={16} />Copy</button><button className="creator-button creator-button-subtle" onClick={() => void share()}><ShareNetwork size={16} />Share</button></>}</> : <Link className="creator-button creator-button-subtle" to="/app/onboarding">Claim your address<ArrowRight size={16} /></Link>}{copyStatus && <p role="status" className="creator-success">{copyStatus}</p>}</div></section>

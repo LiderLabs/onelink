@@ -188,6 +188,7 @@ export function getPublicPage(slug: string) {
 }
 
 const ROOT_ROUTE_COLLISIONS = new Set([
+  'admin',
   'app',
   'forgot-password',
   'login',

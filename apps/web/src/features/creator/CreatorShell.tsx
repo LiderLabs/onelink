@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Outlet, useLocation, useMatch } from 'react-router-dom'
-import { SquaresFour, Files, PencilSimple, Link as LinkIcon, ChartBar, ShareNetwork, Gear, SignOut, DotsThree, X, SidebarSimple } from '@phosphor-icons/react'
+import { SquaresFour, Files, PencilSimple, Link as LinkIcon, ChartBar, ShareNetwork, Gear, ShieldCheck, SignOut, DotsThree, X, SidebarSimple } from '@phosphor-icons/react'
 import { AuthIcon } from '../../components/AuthPage'
 import { SuspendedNotice } from '../../components/SuspendedNotice'
 import { ProfileAvatar } from '../profile/ProfileAvatar'
 import { useSession } from '../../lib/session'
 import { useWorkspaceAppearance } from './workspace-appearance'
+import { isStaff } from '../admin/admin-access'
 import './creator-settings.css'
 
 const SIDEBAR_PREFERENCE = 'onelink:creator-sidebar-hidden'
@@ -22,6 +23,17 @@ export function CreatorShell() {
   })
   const mobileMenu = useRef<HTMLDialogElement>(null)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
+  const accountMenu = useRef<HTMLDivElement>(null)
+  const accountButton = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!accountOpen) return
+    const pointer = (event: PointerEvent) => { if (!accountMenu.current?.contains(event.target as Node)) setAccountOpen(false) }
+    const keyboard = (event: KeyboardEvent) => { if (event.key === 'Escape') { setAccountOpen(false); accountButton.current?.focus() } }
+    document.addEventListener('pointerdown', pointer)
+    document.addEventListener('keydown', keyboard)
+    return () => { document.removeEventListener('pointerdown', pointer); document.removeEventListener('keydown', keyboard) }
+  }, [accountOpen])
   const closeMobileMenu = () => {
     mobileMenu.current?.close()
     setMoreOpen(false)
@@ -35,6 +47,7 @@ export function CreatorShell() {
   useEffect(() => {
     mobileMenu.current?.close()
     setMoreOpen(false)
+    setAccountOpen(false)
   }, [location.pathname])
   useEffect(() => {
     const mobile = window.matchMedia('(max-width: 999px)')
@@ -83,7 +96,7 @@ export function CreatorShell() {
         {editor ? <div id="creator-page-actions" className="creator-page-actions" /> : null}
         <div className="creator-topbar-account">
           {setup ? <Link to="/app/dashboard" className="creator-muted-link">Exit setup</Link> : null}
-          <Link to="/app/settings/profile" className="creator-account-link" aria-label={`Account settings for @${session.user?.username ?? ''}`}><ProfileAvatar avatarKey={session.user?.avatarKey ?? null} displayName={name} className="creator-avatar" /><span>@{session.user?.username}</span></Link>
+          <div className="creator-account-menu" ref={accountMenu} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setAccountOpen(false) }}><button ref={accountButton} type="button" className="creator-account-link" aria-label="Account menu" aria-expanded={accountOpen} aria-controls="creator-account-dropdown" onClick={() => setAccountOpen(value => !value)}><ProfileAvatar avatarKey={session.user?.avatarKey ?? null} displayName={name} className="creator-avatar" /><span>@{session.user?.username}</span></button>{accountOpen && <div className="creator-account-dropdown" id="creator-account-dropdown"><Link to="/app/settings/profile"><Gear size={18} />Account settings</Link>{isStaff(session.user) && session.user?.status === 'active' && !session.mustChangePassword && session.user.impersonatedBy === null && <Link to="/admin"><ShieldCheck size={18} />Admin</Link>}<button type="button" onClick={() => void session.logout()}><SignOut size={18} />Sign out</button></div>}</div>
           <button type="button" className="creator-icon-button" aria-label="Sign out" title="Sign out" onClick={() => void session.logout()}><SignOut size={20} weight="light" /></button>
         </div>
       </header>

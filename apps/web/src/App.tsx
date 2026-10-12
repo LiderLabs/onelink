@@ -21,6 +21,14 @@ import { OnboardingRoute } from './features/creator/OnboardingRoute'
 import { SubmissionsRoute } from './features/console/R2Routes'
 import { LegacyProfileRedirect, SettingsRoute } from './features/creator/CreatorSettingsRoute'
 import { LandingPageRoute } from './features/landing/LandingPageRoute'
+import { AdminGuard } from './features/admin/AdminGuard'
+import { AdminShell } from './features/admin/AdminShell'
+import { AdminOverviewRoute } from './features/admin/AdminOverviewRoute'
+import { AdminUsersRoute } from './features/admin/AdminUsersRoute'
+import { AdminReportsRoute } from './features/admin/AdminReportsRoute'
+import { AdminAppealsRoute } from './features/admin/AdminAppealsRoute'
+import { AdminSettingsRoute } from './features/admin/AdminSettingsRoute'
+import { AdminAuditRoute } from './features/admin/AdminAuditRoute'
 import { Navigate } from 'react-router-dom'
 import type { RouteObject } from 'react-router-dom'
 
@@ -60,6 +68,21 @@ export const routes: RouteObject[] = [
 
       { path: '/forgot-password', element: <ForgotPasswordRoute /> },
       { path: '/reset-password', element: <ResetPasswordRoute /> },
+
+      {
+        path: '/admin', element: <AdminGuard />, children: [{
+          element: <AdminShell />, children: [
+            { index: true, element: <AdminOverviewRoute /> },
+            { path: 'users', element: <AdminUsersRoute /> },
+            { path: 'reports', element: <AdminReportsRoute /> },
+            { path: 'appeals', element: <AdminAppealsRoute /> },
+            { path: 'settings', element: <AdminSettingsRoute /> },
+            { path: 'audit', element: <AdminAuditRoute /> },
+            { path: 'audit-log', element: <Navigate to="/admin/audit" replace /> },
+            { path: '*', element: <ConsoleNotFoundRoute /> },
+          ],
+        }],
+      },
 
       {
         path: '/app',

@@ -6,6 +6,7 @@ import { useSession } from '../lib/session'
 import { AuthIcon, AuthPage } from '../components/AuthPage'
 import { AuthField } from '../components/AuthField'
 import { safeNext } from '../components/Guards'
+import { signedInDestination } from '../features/admin/admin-access'
 
 export function LoginRoute() {
   const session = useSession()
@@ -45,8 +46,8 @@ export function LoginRoute() {
     }
     setPending(true)
     try {
-      await session.login(identifier.trim(), password)
-      navigate('/app', { replace: true })
+      const user = await session.login(identifier.trim(), password)
+      navigate(signedInDestination(user), { replace: true })
     } catch (caught) {
       setError(errorMessageFor(caught))
       setFieldErrors(fieldErrorsFrom(caught))

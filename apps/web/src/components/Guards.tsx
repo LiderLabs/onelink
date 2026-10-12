@@ -1,6 +1,7 @@
 import { useLocation, Navigate, Outlet } from 'react-router-dom'
 import { useSession } from '../lib/session'
 import { Splash, UnavailableScreen } from './StatusScreens'
+import { signedInDestination } from '../features/admin/admin-access'
 
 // ============================================================================
 // Route guards.
@@ -62,7 +63,7 @@ export function RequireAnonymous() {
   if (session.status === 'loading') return <Splash />
   if (session.status === 'unavailable') return <UnavailableScreen />
   if (session.user) {
-    return <Navigate to="/app" replace />
+    return <Navigate to={signedInDestination(session.user)} replace />
   }
 
   return <Outlet />

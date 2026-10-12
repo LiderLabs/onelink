@@ -21,6 +21,7 @@ export function AppShell() {
   const loginMatch = useMatch('/login')
   const registerMatch = useMatch('/register')
   const creatorPage = useMatch('/app/*')
+  const adminPage = useMatch('/admin/*')
   const landingPage = useMatch('/')
   const authPage = Boolean(loginMatch || registerMatch)
   const maintenanceSetting = settings?.settings['platform.maintenance_mode']
@@ -28,6 +29,7 @@ export function AppShell() {
   const maintenanceMessage = settings?.settings['platform.maintenance_message']
 
   if (creatorPage) return <CreatorShell />
+  if (adminPage) return <Outlet />
   if (landingPage) return <Outlet />
 
   return (
