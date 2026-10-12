@@ -20,10 +20,13 @@ export function AppShell() {
   const { status, user, platformName, settings, logout } = useSession()
   const loginMatch = useMatch('/login')
   const registerMatch = useMatch('/register')
+  const forgotPasswordMatch = useMatch('/forgot-password')
+  const resetPasswordMatch = useMatch('/reset-password')
   const creatorPage = useMatch('/app/*')
   const adminPage = useMatch('/admin/*')
   const landingPage = useMatch('/')
-  const authPage = Boolean(loginMatch || registerMatch)
+  const recoveryPage = Boolean(forgotPasswordMatch || resetPasswordMatch)
+  const authPage = Boolean(loginMatch || registerMatch || recoveryPage)
   const maintenanceSetting = settings?.settings['platform.maintenance_mode']
   const maintenanceEnabled = maintenanceSetting === true || maintenanceSetting === 'true'
   const maintenanceMessage = settings?.settings['platform.maintenance_message']
@@ -33,7 +36,7 @@ export function AppShell() {
   if (landingPage) return <Outlet />
 
   return (
-    <div className={`flex min-h-screen flex-col${authPage ? ` auth-shell auth-shell-${registerMatch ? 'register' : 'login'}` : ' console-page'}`}>
+    <div className={`flex min-h-screen flex-col${authPage ? ` auth-shell auth-shell-${registerMatch ? 'register' : recoveryPage ? 'recovery' : 'login'}` : ' console-page'}`}>
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-ink focus:px-3 focus:py-2 focus:font-mono focus:text-xs focus:uppercase focus:text-paper"

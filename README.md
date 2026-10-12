@@ -6,7 +6,7 @@ OneLink is a link-in-bio platform for creators and businesses. It brings a profi
 
 This repository contains the public website, creator workspace, admin workspace, and API. Creators can sign up, complete onboarding, edit their page, publish it, and share its address or QR code. Staff can manage accounts, review reports and appeals, update platform settings, and inspect audit records.
 
-For backend integration, start with [Backend developer handoff](#backend-developer-handoff). It documents the latest admin work, the existing API contracts it consumes, and the remaining integration work.
+For backend integration, start with [Backend developer handoff](#backend-developer-handoff). It documents password recovery, the admin workspace, the existing API contracts they consume, and remaining integration work.
 
 ## Contents
 
@@ -52,7 +52,12 @@ For backend integration, start with [Backend developer handoff](#backend-develop
 - Compact, transparent sticky navigation, responsive layouts, animated hero elements, and a footer button that returns to the top.
 - Sign up with an account username, email, password confirmation, and optional display name.
 - Sign in using an email address or username, show/hide password controls, and links back to the landing page.
-- Password-change and password-reset flows, registration availability checks, and session-based access to the workspace.
+- Forgot-password and reset-password screens using the current dark/cyan auth card and OneLink logo, with email/password validation, pending states, readable API errors, and home/sign-in navigation.
+- Password changes, registration availability checks, and session-based access to the workspace.
+
+Password recovery starts with **Forgot password?** on `/login`, or directly at `/forgot-password`. Enter the account email and choose **Send reset link**, then follow the latest link to `/reset-password?token=...`, enter matching new passwords, and sign in again. Links expire after one hour and work once; requesting another link invalidates previous links. A successful reset ends all existing sessions.
+
+**Email delivery is not connected yet.** The existing API creates reset tokens and renders the email template, but no provider sends the message. Local development shows **Open development reset link** when the API returns a development token for an existing account. Production must deliver the link by email; the frontend does not expose tokens or claim that mail was delivered there. The request confirmation remains generic for registered and unregistered addresses.
 
 ### Creator dashboard and navigation
 
@@ -170,11 +175,18 @@ Team-invitation, private moderation-evidence uploads, content-flag management, a
 
 ## Backend developer handoff
 
-**Updated: 12 October 2026. Latest feature: the admin workspace.** This implementation added frontend screens and API clients; it did not change backend routes, schemas, migrations, or permission rules.
+**Updated: 12 October 2026. Latest update: password-recovery UI; the admin workspace is also delivered.** These frontend changes preserve existing backend routes, schemas, migrations, and permission rules.
 
 The public landing page, authentication, creator dashboard, onboarding, profile/social editor, page editor, link manager, published pages, Share & QR, and account-settings sections are already built. Their behavior and storage are described under [Implemented features](#implemented-features). Real creator analytics and several account-settings actions remain unavailable; see the [remaining-work table](#current-limitations).
 
-### Latest admin delivery
+### Password recovery connections
+
+- `POST /api/v1/auth/forgot-password` receives `{ email }` and returns `{ data: { accepted: true, devToken?: string | null } }`. The frontend trims/validates email, prevents duplicate pending requests, and displays rate-limit, network, and validation errors.
+- `POST /api/v1/auth/reset-password` receives `{ token, newPassword }`. Client validation checks 8–200 characters and matching confirmation; the server enforces its existing password policy and token validity. Successful resets clear the password inputs, refresh session state, and offer sign-in with the new password.
+- Missing/malformed links offer a new reset request. Expired/used-link errors come from the API. Tokens are carried in the link rather than printed in the page copy.
+- Backend delivery work remains in [email.service.ts](apps/api/src/services/email.service.ts): connect the provider through `deliver()` and preserve the existing one-hour expiry, single-use tokens, generic confirmation, and session revocation. `APP_ORIGIN` must point to the frontend origin for emailed links.
+
+### Admin delivery
 
 - Staff sign-in redirects to `/admin`; the creator avatar dropdown also provides an Admin entry.
 - Overview, Users, Reports, Appeals, System Settings, and Audit Log are mounted routes with loading, empty, error, and permission states.
@@ -215,7 +227,9 @@ Frontend contracts: [users](apps/web/src/features/admin/users-api.ts), [moderati
 
 ### Review and verification
 
-The last feature verification on **12 October 2026** passed the production build/TypeScript checks, all four admin browser scripts, the landing/auth regression script, and **305 API tests across 17 test files**. Admin browser scripts intercept API responses; the API suite uses isolated Workers/D1/R2 test storage. These checks do not replace manual verification against the development database or a deployed environment.
+Admin feature verification on **12 October 2026** passed the production build/TypeScript checks, all four admin browser scripts, the landing/auth regression script, and **305 API tests across 17 test files**. Admin browser scripts intercept API responses; the API suite uses isolated Workers/D1/R2 test storage. These checks do not replace manual verification against the development database or a deployed environment.
+
+Password-recovery verification on the same date passed the production build, the recovery browser check against Vite on `5173` and Worker-served assets on `8787`, the landing/auth regression check, and **21 authentication API tests**. Browser recovery requests use fixtures; the auth tests independently exercise the existing API. No account password in the local development database was changed by these checks.
 
 For manual review, sign in at `/login` using the seeded owner account, complete the required password change, then open `/admin`. Check creation/editing and suspension/reactivation using a disposable account, confirm report/appeal actions when queue entries exist, refresh after a settings save, and inspect/export the resulting audit records. Repeat with an ordinary creator to confirm `/admin` redirects to the creator dashboard. Setup and commands are below.
 
@@ -446,6 +460,15 @@ node scripts/browser/admin-users-check.mjs
 node scripts/browser/admin-moderation-check.mjs
 node scripts/browser/admin-settings-audit-check.mjs
 ```
+
+Password-recovery checks also use intercepted API fixtures, so they do not change account passwords or send emails:
+
+```bash
+node scripts/browser/password-recovery-check.mjs
+npm run test -w @onelink/api -- auth.spec.ts
+```
+
+The browser check covers 320–1440px layouts, auth navigation, form validation, duplicate pending submissions, development-token links, production confirmation without a token, and reset success/error states. Its default origin is `http://127.0.0.1:5173`; set `BASE_URL` to check another running origin.
 
 For older checks that export a function accepting a Playwright page, use the repository runner:
 

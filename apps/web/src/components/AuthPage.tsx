@@ -18,12 +18,12 @@ export function AuthIcon({ name }: { name: 'user' | 'email' | 'key' | 'shield' |
   )
 }
 
-/** Signup and sign-in share the reference's centered card; recovery keeps AuthFrame. */
+/** Shared branding and centered card for sign-in, signup, and password recovery. */
 export function AuthPage({ title, description, children, variant = 'login' }: {
   title: string
   description: string
   children: ReactNode
-  variant?: 'login' | 'register'
+  variant?: 'login' | 'register' | 'recovery'
 }) {
   const { platformName } = useSession()
   useEffect(() => {
