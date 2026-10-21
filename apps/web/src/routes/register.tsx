@@ -107,7 +107,6 @@ export function RegisterRoute() {
         </fieldset>
       </form>}
       <p className="auth-form-footer">Already have an account?<Link className="auth-link" to={loginUrl}>Log in</Link></p>
-      <p className="auth-session-note"><AuthIcon name="shield" />Your account uses a secure, private session.</p>
     </AuthPage>
   )
 }

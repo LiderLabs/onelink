@@ -27,6 +27,7 @@ export function AppShell() {
   const landingPage = useMatch('/')
   const recoveryPage = Boolean(forgotPasswordMatch || resetPasswordMatch)
   const authPage = Boolean(loginMatch || registerMatch || recoveryPage)
+  const authFooterPage = authPage && !loginMatch && !registerMatch
   const maintenanceSetting = settings?.settings['platform.maintenance_mode']
   const maintenanceEnabled = maintenanceSetting === true || maintenanceSetting === 'true'
   const maintenanceMessage = settings?.settings['platform.maintenance_message']
@@ -99,10 +100,10 @@ export function AppShell() {
         <Outlet />
       </main>
 
-      {authPage ? <footer className="auth-footer">
+      {authPage ? (authFooterPage ? <footer className="auth-footer">
         <p>© {new Date().getFullYear()} {platformName}<span>All your links. One place.</span></p>
         <p><span className="auth-footer-status">{settings ? 'Status: Connected' : 'Status: Unavailable'}</span><span aria-hidden="true">·</span>Secure sessions</p>
-      </footer> : <footer className="border-t border-rule bg-paper-deep/80">
+      </footer> : null) : <footer className="border-t border-rule bg-paper-deep/80">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-5 sm:px-6">
           <p className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-ink-faint">
             {platformName} · console

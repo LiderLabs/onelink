@@ -57,6 +57,10 @@
 
 .auth-shell-register .auth-ambient { height: 2rem; }
 .auth-shell-register .auth-ambient::before { width: min(42rem, 95vw); top: 0; }
+.auth-shell-login .auth-ambient,
+.auth-shell-register .auth-ambient { height: .5rem; }
+.auth-shell-login .auth-ambient::before,
+.auth-shell-register .auth-ambient::before { top: -2rem; }
 
 .auth-main {
   position: relative;
@@ -80,7 +84,8 @@
   pointer-events: none;
 }
 
-.auth-shell-register .auth-main { padding-block: 1rem 2.5rem; }
+.auth-shell-login .auth-main,
+.auth-shell-register .auth-main { padding-block: .375rem 1rem; }
 .auth-layout { position: relative; width: min(100%, 28.75rem); }
 .auth-layout-register { width: min(100%, 30.625rem); }
 
@@ -88,8 +93,8 @@
   display: inline-flex;
   align-items: center;
   gap: .5rem;
-  min-height: 44px;
-  margin-bottom: .5rem;
+  min-height: 36px;
+  margin-bottom: .125rem;
   padding-inline: .25rem;
   border-radius: .375rem;
   color: var(--auth-accent);
@@ -106,6 +111,16 @@
   background: #12151deF;
   box-shadow: 0 0 70px -30px #00d8ef35;
 }
+
+.auth-layout-login .auth-form-panel,
+.auth-layout-register .auth-form-panel { padding-block: 1.25rem; }
+.auth-layout-login .auth-form-heading,
+.auth-layout-register .auth-form-heading { margin-bottom: .875rem; }
+.auth-layout-register .auth-form,
+.auth-layout-register .auth-form-fields { gap: .75rem; }
+.auth-layout-register .auth-field-label { margin-bottom: .3125rem; }
+.auth-layout-register .auth-input-wrap { min-height: 2.5rem; }
+.auth-layout-register .auth-input { min-height: 2.375rem; }
 
 .auth-layout-login .auth-form-panel {
   padding-bottom: 2.25rem;
@@ -252,7 +267,7 @@
 .auth-link:hover { color: #87f3ff; text-decoration: underline; text-underline-offset: .25rem; }
 .auth-form-footer { margin-top: 1.5rem; padding-top: 1.125rem; border-top: 1px solid #252936; color: var(--auth-muted); text-align: center; font-size: .8125rem; line-height: 1.7; }
 .auth-form-footer .auth-link { margin-left: .375rem; }
-.auth-layout-login .auth-form-footer { margin-top: 2.5rem; padding-top: 0; border: 0; font-size: .875rem; }
+.auth-layout-login .auth-form-footer { margin-top: 1.25rem; padding-top: 0; border: 0; font-size: .875rem; }
 .auth-session-note { display: flex; align-items: center; justify-content: center; gap: .375rem; margin-top: .875rem; color: #7f8797; font-size: .6875rem; line-height: 1.7; text-align: center; }
 .auth-session-note svg { flex-shrink: 0; width: .875rem; height: .875rem; }
 
@@ -299,6 +314,8 @@
   .auth-ambient { height: 2rem; }
   .auth-shell-register .auth-ambient { height: 1.5rem; }
   .auth-main, .auth-shell-register .auth-main { padding: .75rem 1rem 1.5rem; }
+  .auth-shell-login .auth-main,
+  .auth-shell-register .auth-main { padding: .25rem 1rem .75rem; }
   .auth-form-panel, .auth-layout-login .auth-form-panel { padding: 1.5rem; border-radius: 1.125rem; }
   .auth-input { font-size: 1rem; }
   .auth-input-prefix, .auth-input-with-prefix .auth-input { font-size: .75rem; }

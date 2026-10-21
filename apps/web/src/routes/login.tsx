@@ -77,7 +77,6 @@ export function LoginRoute() {
         </fieldset>
       </form>
       {registrationOpen ? <p className="auth-form-footer">Don't have an account?<Link className="auth-link" to={`/register${next ? `?next=${encodeURIComponent(next)}` : ''}`}>Create account</Link></p> : null}
-      <p className="auth-session-note"><AuthIcon name="shield" />Your account uses a secure, private session.</p>
     </AuthPage>
   )
 }
